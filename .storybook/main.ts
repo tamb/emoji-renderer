@@ -20,6 +20,12 @@ const config: StorybookConfig = {
         : {}),
       "emoji-renderer": path.resolve(root, "../src/index.ts"),
     };
+
+    // Set by the Deploy Storybook workflow for GitHub Pages project sites.
+    if (process.env.STORYBOOK_BASE_PATH) {
+      config.base = process.env.STORYBOOK_BASE_PATH;
+    }
+
     return config;
   },
 };
