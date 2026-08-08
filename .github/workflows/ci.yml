@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Check
+        run: npx vp check
+
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium
+
+      - name: Test with coverage
+        run: npx vp test --project unit --coverage
+
+      - name: Browser tests
+        run: npx vp test --project browser
+
+      - name: Pack
+        run: npx vp pack
+
+      - name: Build Storybook
+        run: npm run build-storybook

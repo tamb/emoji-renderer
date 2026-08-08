@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>emoji-renderer demo</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: system-ui, sans-serif;
+      }
+
+      body {
+        margin: 2rem auto;
+        max-width: 40rem;
+        line-height: 1.5;
+      }
+
+      .preview {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-top: 1rem;
+      }
+
+      img {
+        width: 72px;
+        height: 72px;
+        image-rendering: pixelated;
+      }
+
+      pre {
+        overflow: auto;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        background: color-mix(in srgb, CanvasText 8%, Canvas);
+      }
+    </style>
+  </head>
+  <body>
+    <h1>emoji-renderer demo</h1>
+    <label>
+      Emoji
+      <input id="emoji" type="text" value="😀" maxlength="32" />
+    </label>
+    <div class="preview">
+      <img id="image" alt="" />
+      <div id="svg"></div>
+    </div>
+    <pre id="svg-source"></pre>
+    <script type="module">
+      import { emojiToImage, emojiToSvg } from "../src/index.ts";
+
+      const emojiInput = document.querySelector("#emoji");
+      const imageEl = document.querySelector("#image");
+      const svgEl = document.querySelector("#svg");
+      const svgSourceEl = document.querySelector("#svg-source");
+
+      async function render() {
+        const emoji = emojiInput.value || "😀";
+        const [svg, image] = await Promise.all([
+          emojiToSvg(emoji, { size: 72 }),
+          emojiToImage(emoji, { size: 72 }),
+        ]);
+
+        svgEl.innerHTML = svg;
+        svgSourceEl.textContent = svg;
+        imageEl.src = image.src;
+        imageEl.alt = emoji;
+      }
+
+      emojiInput.addEventListener("input", () => {
+        render().catch(console.error);
+      });
+
+      render().catch(console.error);
+    </script>
+  </body>
+</html>
