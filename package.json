@@ -1,6 +1,6 @@
 {
   "name": "emoji-renderer",
-  "version": "0.0.0",
+  "version": "0.1.0-rc.1",
   "description": "Convert emoji to SVG markup or raster images with lazy-loaded Twemoji assets.",
   "keywords": [
     "canvas",

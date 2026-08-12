@@ -22,8 +22,8 @@ jobs:
       - name: Check
         run: npx vp check
 
-      - name: Install Playwright Chromium
-        run: npx playwright install chromium
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium firefox webkit
 
       - name: Test with coverage
         run: npx vp test --project unit --coverage
