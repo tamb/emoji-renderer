@@ -8,12 +8,7 @@ import {
   resolveRenderSize,
   resolveResponsiveImage,
 } from "./responsive.ts";
-import {
-  blobToHtmlImage,
-  loadImageFromUrl,
-  svgToDataUrl,
-  svgToImageBlob,
-} from "./svgToImage.ts";
+import { blobToHtmlImage, loadImageFromUrl, svgToDataUrl, svgToImageBlob } from "./svgToImage.ts";
 import type { EmojiImageFormat, EmojiToImageOptions, EmojiToImageResult } from "./types.ts";
 
 interface RenderEmojiBlobOptions {
