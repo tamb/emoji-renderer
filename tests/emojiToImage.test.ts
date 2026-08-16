@@ -3,6 +3,7 @@ import { emojiToImage } from "../src/emojiToImage.ts";
 import { IncompatibleOptionsError } from "../src/errors.ts";
 import { sharedSvgCache } from "../src/svgCache.ts";
 import { mockCanvas, mockTwemojiFetch } from "./helpers.ts";
+import { parseHtmlSrcset } from "./parseHtmlSrcset.ts";
 
 describe("emojiToImage", () => {
   let restoreOffscreenCanvas: (() => void) | undefined;
@@ -27,6 +28,20 @@ describe("emojiToImage", () => {
     expect(image).toBeInstanceOf(HTMLImageElement);
     expect(image.width).toBe(32);
     expect(image.height).toBe(32);
+    expect(image.src.startsWith("data:image/png;base64,")).toBe(true);
+  });
+
+  test("does not revoke the URL used as image.src", async () => {
+    restoreOffscreenCanvas = mockCanvas();
+    const revoke = vi.spyOn(URL, "revokeObjectURL");
+
+    const image = await emojiToImage("😀", {
+      fetch: mockTwemojiFetch(),
+      size: 32,
+    });
+
+    expect(revoke).not.toHaveBeenCalled();
+    expect(image.src.length).toBeGreaterThan(0);
   });
 
   test("returns a Blob when format is blob", async () => {
@@ -136,6 +151,11 @@ describe("emojiToImage", () => {
     vi.unstubAllGlobals();
   });
 
+  test("HTML srcset parsing splits data URLs on the metadata comma", () => {
+    const dataUrlSrcset = "data:image/png;base64,abc 24w, data:image/png;base64,def 48w";
+    expect(parseHtmlSrcset(dataUrlSrcset)).toHaveLength(4);
+  });
+
   test("builds srcset descriptors for logical widths", async () => {
     restoreOffscreenCanvas = mockCanvas();
     vi.stubGlobal("devicePixelRatio", 2);
@@ -148,8 +168,10 @@ describe("emojiToImage", () => {
       responsive: { dpr: 2, display: "css" },
     });
 
-    expect(image.srcset).toContain(" 48w");
-    expect(image.srcset).toContain(" 96w");
+    const candidates = parseHtmlSrcset(image.srcset);
+    expect(candidates).toHaveLength(2);
+    expect(candidates.map((candidate) => candidate.descriptors)).toEqual(["48w", "96w"]);
+    expect(candidates.every((candidate) => candidate.url.startsWith("blob:"))).toBe(true);
     expect(image.sizes).toBe("(max-width: 600px) 24px, 48px");
 
     vi.unstubAllGlobals();

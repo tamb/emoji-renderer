@@ -1,11 +1,11 @@
 import { InvalidEmojiError, RasterizeError } from "./errors.ts";
 import {
   blobToDataUrl,
+  blobToHtmlImage,
   canvasToBlob,
   createCanvas,
   drawImageToContext,
   get2dContext,
-  loadImageFromUrl,
 } from "./svgToImage.ts";
 
 export const DEFAULT_EMOJI_FONT_FAMILY =
@@ -41,6 +41,7 @@ function renderNativeEmojiCanvas(
     context.fillRect(0, 0, size, size);
   }
 
+  context.fillStyle = "#000";
   context.font = `${Math.round(size * 0.85)}px ${fontFamily}`;
   context.textAlign = "center";
   context.textBaseline = "middle";
@@ -88,14 +89,5 @@ export async function nativeEmojiToHtmlImage(
   options: NativeToImageOptions,
 ): Promise<HTMLImageElement> {
   const blob = await nativeEmojiToImageBlob(options);
-  const objectUrl = URL.createObjectURL(blob);
-
-  try {
-    const image = await loadImageFromUrl(objectUrl);
-    image.width = options.size ?? 72;
-    image.height = options.size ?? 72;
-    return image;
-  } finally {
-    URL.revokeObjectURL(objectUrl);
-  }
+  return blobToHtmlImage(blob, options.size ?? 72);
 }

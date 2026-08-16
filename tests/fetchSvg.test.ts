@@ -1,8 +1,8 @@
-import { beforeEach, describe, expect, test } from "vite-plus/test";
+import { beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { buildSvgUrl, fetchSvgText } from "../src/fetchSvg.ts";
 import { EmojiNotFoundError } from "../src/errors.ts";
 import { sharedSvgCache } from "../src/svgCache.ts";
-import { mockTwemojiFetch, SAMPLE_SVG } from "./helpers.ts";
+import { mockTwemojiFetch, requestUrl, SAMPLE_SVG } from "./helpers.ts";
 
 describe("buildSvgUrl", () => {
   test("builds default Twemoji URLs", () => {
@@ -55,6 +55,36 @@ describe("fetchSvgText", () => {
         cache: false,
       }),
     ).rejects.toBeInstanceOf(EmojiNotFoundError);
+  });
+
+  test("does not reuse cache entries across different extensions", async () => {
+    const svgMarkup = "<svg>a</svg>";
+    const pngMarkup = "<svg>b</svg>";
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      const url = requestUrl(input);
+      if (url.endsWith(".svg")) {
+        return new Response(svgMarkup, { status: 200 });
+      }
+      if (url.endsWith(".png")) {
+        return new Response(pngMarkup, { status: 200 });
+      }
+      return new Response(null, { status: 404 });
+    }) as typeof fetch;
+
+    const svg = await fetchSvgText({
+      emoji: "😀",
+      source: { baseUrl: "https://example.com/emoji", ext: ".svg" },
+      fetch: fetchImpl,
+    });
+    const png = await fetchSvgText({
+      emoji: "😀",
+      source: { baseUrl: "https://example.com/emoji", ext: ".png" },
+      fetch: fetchImpl,
+    });
+
+    expect(svg).toBe(svgMarkup);
+    expect(png).toBe(pngMarkup);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
   test("returns fetched SVG text", async () => {
