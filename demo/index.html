@@ -58,14 +58,14 @@
 
       async function render() {
         const emoji = emojiInput.value || "😀";
-        const [svg, image] = await Promise.all([
+        const [svg, dataUrl] = await Promise.all([
           emojiToSvg(emoji, { size: 72 }),
-          emojiToImage(emoji, { size: 72 }),
+          emojiToImage(emoji, { size: 72, format: "dataUrl" }),
         ]);
 
         svgEl.innerHTML = svg;
         svgSourceEl.textContent = svg;
-        imageEl.src = image.src;
+        imageEl.src = dataUrl;
         imageEl.alt = emoji;
       }
 
