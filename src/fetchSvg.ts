@@ -36,10 +36,9 @@ export async function fetchSvgText(options: FetchSvgOptions): Promise<string> {
 
   const codePoint = emojiToCodePoint(emoji);
   const url = buildSvgUrl(codePoint, source);
-  const cacheKey = `${source === "twemoji" ? "twemoji" : source.baseUrl}:${codePoint}`;
 
   if (cache) {
-    const cached = cacheStore.get(cacheKey);
+    const cached = cacheStore.get(url);
     if (cached !== undefined) {
       return cached;
     }
@@ -57,7 +56,7 @@ export async function fetchSvgText(options: FetchSvgOptions): Promise<string> {
   const svgText = await response.text();
 
   if (cache) {
-    cacheStore.set(cacheKey, svgText);
+    cacheStore.set(url, svgText);
   }
 
   return svgText;

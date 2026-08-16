@@ -125,6 +125,7 @@ describe("svgToImage", () => {
     expect(image).toBeInstanceOf(HTMLImageElement);
     expect(image.width).toBe(32);
     expect(image.height).toBe(32);
+    expect(image.src.startsWith("data:image/png;base64,")).toBe(true);
   });
 
   test("throws RasterizeError when canvas context is unavailable", async () => {

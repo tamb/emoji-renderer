@@ -8,7 +8,12 @@ import {
   resolveRenderSize,
   resolveResponsiveImage,
 } from "./responsive.ts";
-import { blobToDataUrl, loadImageFromUrl, svgToDataUrl, svgToImageBlob } from "./svgToImage.ts";
+import {
+  blobToHtmlImage,
+  loadImageFromUrl,
+  svgToDataUrl,
+  svgToImageBlob,
+} from "./svgToImage.ts";
 import type { EmojiImageFormat, EmojiToImageOptions, EmojiToImageResult } from "./types.ts";
 
 interface RenderEmojiBlobOptions {
@@ -66,19 +71,6 @@ async function renderEmojiBlob(options: RenderEmojiBlobOptions): Promise<Blob> {
   });
 }
 
-async function blobToHtmlImage(blob: Blob, renderSize: number): Promise<HTMLImageElement> {
-  const objectUrl = URL.createObjectURL(blob);
-
-  try {
-    const image = await loadImageFromUrl(objectUrl);
-    image.width = renderSize;
-    image.height = renderSize;
-    return image;
-  } finally {
-    URL.revokeObjectURL(objectUrl);
-  }
-}
-
 async function renderEmojiImageElement(
   emoji: string,
   logicalSize: number,
@@ -122,7 +114,7 @@ async function renderEmojiImageElement(
       });
       variants.push({
         physicalWidth: renderSize,
-        url: await blobToDataUrl(blob),
+        url: URL.createObjectURL(blob),
       });
     }
 
