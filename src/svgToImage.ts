@@ -145,15 +145,16 @@ export async function svgToDataUrl(options: SvgToImageOptions): Promise<string> 
   return blobToDataUrl(blob);
 }
 
-export async function blobToHtmlImage(blob: Blob, size: number): Promise<HTMLImageElement> {
-  const dataUrl = await blobToDataUrl(blob);
-  const image = await loadImageFromUrl(dataUrl);
-  image.width = size;
-  image.height = size;
-  return image;
-}
-
 export async function svgToHtmlImage(options: SvgToImageOptions): Promise<HTMLImageElement> {
   const blob = await svgToImageBlob(options);
-  return blobToHtmlImage(blob, options.size ?? 72);
+  const objectUrl = URL.createObjectURL(blob);
+
+  try {
+    const image = await loadImageFromUrl(objectUrl);
+    image.width = options.size ?? 72;
+    image.height = options.size ?? 72;
+    return image;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
 }

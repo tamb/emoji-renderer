@@ -53,7 +53,7 @@ describe("nativeToImage", () => {
     await nativeEmojiToImageBlob({ emoji: "🎉", size: 32, background: "#112233" });
 
     expect(fillRect).toHaveBeenCalledWith(0, 0, 32, 32);
-    expect(context.fillStyle).toBe("#000");
+    expect(context.fillStyle).toBe("#112233");
   });
 
   test("pixelates output with nearest-neighbor scaling", async () => {
@@ -90,7 +90,6 @@ describe("nativeToImage", () => {
     expect(image).toBeInstanceOf(HTMLImageElement);
     expect(image.width).toBe(40);
     expect(image.height).toBe(40);
-    expect(image.src.startsWith("data:image/png;base64,")).toBe(true);
   });
 
   test("throws InvalidEmojiError for empty emoji", async () => {
