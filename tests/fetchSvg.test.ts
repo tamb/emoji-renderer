@@ -1,23 +1,60 @@
 import { beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { buildSvgUrl, fetchSvgText } from "../src/fetchSvg.ts";
 import { EmojiNotFoundError } from "../src/errors.ts";
+import { buildAssetUrl, formatCodePoint } from "../src/sources.ts";
 import { sharedSvgCache } from "../src/svgCache.ts";
-import { mockTwemojiFetch, requestUrl, SAMPLE_SVG } from "./helpers.ts";
+import {
+  FAMILY_CODEPOINT,
+  FAMILY_CODEPOINT_NOTO,
+  FAMILY_CODEPOINT_OPENMOJI,
+  mockTwemojiFetch,
+  NOTO_BASE,
+  OPENMOJI_BASE,
+  requestUrl,
+  SAMPLE_SVG,
+  TWEMOJI_BASE,
+} from "./helpers.ts";
+
+describe("formatCodePoint", () => {
+  test("formats Twemoji, OpenMoji, and Noto stems", () => {
+    expect(formatCodePoint("1f600")).toBe("1f600");
+    expect(formatCodePoint("1f600", "openmoji")).toBe("1F600");
+    expect(formatCodePoint("1f600", "noto")).toBe("emoji_u1f600");
+    expect(formatCodePoint(FAMILY_CODEPOINT, "openmoji")).toBe(FAMILY_CODEPOINT_OPENMOJI);
+    expect(formatCodePoint(FAMILY_CODEPOINT, "noto")).toBe(FAMILY_CODEPOINT_NOTO);
+  });
+});
 
 describe("buildSvgUrl", () => {
   test("builds default Twemoji URLs", () => {
-    expect(buildSvgUrl("1f600")).toBe(
-      "https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0/assets/svg/1f600.svg",
+    expect(buildSvgUrl("1f600")).toBe(`${TWEMOJI_BASE}/1f600.svg`);
+  });
+
+  test("builds OpenMoji and Noto preset URLs", () => {
+    expect(buildAssetUrl("1f600", "openmoji")).toBe(`${OPENMOJI_BASE}/1F600.svg`);
+    expect(buildAssetUrl("1f600", "noto")).toBe(`${NOTO_BASE}/emoji_u1f600.svg`);
+    expect(buildAssetUrl(FAMILY_CODEPOINT, "openmoji")).toBe(
+      `${OPENMOJI_BASE}/${FAMILY_CODEPOINT_OPENMOJI}.svg`,
+    );
+    expect(buildAssetUrl(FAMILY_CODEPOINT, "noto")).toBe(
+      `${NOTO_BASE}/${FAMILY_CODEPOINT_NOTO}.svg`,
     );
   });
 
-  test("builds custom CDN URLs with optional extensions", () => {
+  test("builds custom CDN URLs with optional extensions and formats", () => {
     expect(
       buildSvgUrl("1f600", {
         baseUrl: "https://cdn.example.com/assets/",
         ext: ".svg+xml",
       }),
     ).toBe("https://cdn.example.com/assets/1f600.svg+xml");
+
+    expect(
+      buildAssetUrl("1f600", {
+        baseUrl: "https://cdn.example.com/openmoji",
+        codePointFormat: "openmoji",
+      }),
+    ).toBe("https://cdn.example.com/openmoji/1F600.svg");
   });
 });
 

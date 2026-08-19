@@ -8,17 +8,24 @@ describe("emoji renderer browser integration", () => {
     expect(svg).toContain("<svg");
     expect(svg).toContain('width="64"');
 
-    const image = await emojiToImage("😀", { size: 64, cache: false });
+    const image = await emojiToImage("😀", { source: "twemoji", size: 64, cache: false });
     expect(image).toBeInstanceOf(HTMLImageElement);
     expect(image.naturalWidth).toBeGreaterThan(0);
     expect(image.naturalHeight).toBeGreaterThan(0);
   });
 
-  test("returns a data URL from a real CDN fetch", async () => {
+  test("fetches OpenMoji and Noto SVG presets", async () => {
+    const openmoji = await emojiToSvg("😀", { source: "openmoji", size: 48, cache: false });
+    const noto = await emojiToSvg("😀", { source: "noto", size: 48, cache: false });
+
+    expect(openmoji).toContain("<svg");
+    expect(noto).toContain("<svg");
+  });
+
+  test("defaults emojiToImage to native system emoji", async () => {
     const dataUrl = await emojiToImage("🎉", {
       format: "dataUrl",
       size: 48,
-      cache: false,
     });
 
     expect(typeof dataUrl).toBe("string");
@@ -31,8 +38,8 @@ describe("emoji renderer browser integration", () => {
   });
 
   test("pixelates emoji output in the browser", async () => {
-    const sharp = await emojiToImage("😀", { size: 64, cache: false });
-    const pixelated = await emojiToImage("😀", { size: 64, pixelate: 8, cache: false });
+    const sharp = await emojiToImage("😀", { size: 64 });
+    const pixelated = await emojiToImage("😀", { size: 64, pixelate: 8 });
 
     expect(sharp).toBeInstanceOf(HTMLImageElement);
     expect(pixelated).toBeInstanceOf(HTMLImageElement);
@@ -57,7 +64,6 @@ describe("emoji renderer browser integration", () => {
       size: 48,
       srcSet: [24, 48],
       responsive: { dpr: 1, display: "css" },
-      cache: false,
     });
 
     expect(image.srcset).toContain("24w");

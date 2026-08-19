@@ -10,13 +10,14 @@ interface EmojiToImageStoryArgs {
   background: string;
   pixelate: number;
   cache: boolean;
-  sourceMode: "twemoji" | "native" | "custom";
+  sourceMode: "native" | "twemoji" | "openmoji" | "noto" | "custom";
   fontFamily: string;
   responsive: boolean;
   srcSet: string;
   sizes: string;
   customBaseUrl: string;
   customExt: string;
+  customCodePointFormat: "twemoji" | "openmoji" | "noto";
 }
 
 const meta = {
@@ -30,13 +31,14 @@ const meta = {
     background: "",
     pixelate: 0,
     cache: true,
-    sourceMode: "twemoji",
+    sourceMode: "native",
     fontFamily: "",
     responsive: false,
     srcSet: "",
     sizes: "(max-width: 600px) 24px, 48px",
     customBaseUrl: "https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0/assets/svg",
     customExt: ".svg",
+    customCodePointFormat: "twemoji",
   },
   argTypes: {
     emoji: {
@@ -74,9 +76,9 @@ const meta = {
     },
     sourceMode: {
       control: "select",
-      options: ["twemoji", "native", "custom"],
+      options: ["native", "twemoji", "openmoji", "noto", "custom"],
       description:
-        'Asset source. `"twemoji"` uses the default jsDelivr CDN. `"native"` draws the system emoji font via canvas.',
+        'Asset source. `"native"` (default) draws the system emoji font. CDN presets use pinned jsDelivr URLs.',
     },
     fontFamily: {
       control: "text",
@@ -108,19 +110,25 @@ const meta = {
       description: 'File extension when sourceMode is `custom`. Default: ".svg".',
       if: { arg: "sourceMode", eq: "custom" },
     },
+    customCodePointFormat: {
+      control: "select",
+      options: ["twemoji", "openmoji", "noto"],
+      description: "Filename stem style for custom sources.",
+      if: { arg: "sourceMode", eq: "custom" },
+    },
   },
   parameters: {
     docs: {
       description: {
         component: `
-Fetches Twemoji SVG artwork, rasterizes it via canvas, and returns an image.
+Fetches CDN SVG artwork (or draws native system emoji), rasterizes via canvas, and returns an image.
 
 ## Usage
 
 \`\`\`ts
 import { emojiToImage } from "emoji-renderer/emojiToImage";
 
-const image = await emojiToImage("😀", { size: 48 });
+const image = await emojiToImage("😀", { size: 48 }); // native by default
 document.body.append(image);
 \`\`\`
 
@@ -134,7 +142,7 @@ const image = await emojiToImage("🎉");
 
 ## Examples
 
-**HTMLImageElement (default)**
+**HTMLImageElement (default, native)**
 
 \`\`\`ts
 const image = await emojiToImage("😀", { size: 48 });
@@ -183,13 +191,12 @@ const image = await emojiToImage("😀", {
 document.body.append(image);
 \`\`\`
 
-**Native system emoji (no CDN fetch)**
+**CDN presets**
 
 \`\`\`ts
-const image = await emojiToImage("😀", {
-  source: "native",
-  size: 48,
-});
+const twemoji = await emojiToImage("😀", { source: "twemoji", size: 48 });
+const openmoji = await emojiToImage("😀", { source: "openmoji", size: 48 });
+const noto = await emojiToImage("😀", { source: "noto", size: 48 });
 \`\`\`
 
 **Pixelated output**
@@ -207,7 +214,7 @@ const image = await emojiToImage("👾", {
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
 | \`size\` | \`number\` | \`72\` | Width and height in pixels |
-| \`source\` | \`"twemoji" \\| "native" \\| { baseUrl, ext? }\` | \`"twemoji"\` | CDN, system emoji font, or custom asset base |
+| \`source\` | \`"native" \\| "twemoji" \\| "openmoji" \\| "noto" \\| { baseUrl, ext?, codePointFormat? }\` | \`"native"\` | System font, CDN preset, or custom asset base |
 | \`fetch\` | \`typeof fetch\` | \`globalThis.fetch\` | Custom fetch (not exposed here) |
 | \`cache\` | \`boolean\` | \`true\` | Cache fetched SVG text |
 | \`signal\` | \`AbortSignal\` | — | Abort in-flight fetch (not exposed here) |
@@ -229,16 +236,14 @@ export default meta;
 type Story = StoryObj<EmojiToImageStoryArgs>;
 
 function resolveSource(args: EmojiToImageStoryArgs): EmojiImageSource {
-  if (args.sourceMode === "native") {
-    return "native";
-  }
   if (args.sourceMode === "custom") {
     return {
       baseUrl: args.customBaseUrl,
       ext: args.customExt || ".svg",
+      codePointFormat: args.customCodePointFormat,
     };
   }
-  return "twemoji";
+  return args.sourceMode;
 }
 
 function parseSrcSet(value: string): number[] | undefined {

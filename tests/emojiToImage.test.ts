@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/tes
 import { emojiToImage } from "../src/emojiToImage.ts";
 import { IncompatibleOptionsError } from "../src/errors.ts";
 import { sharedSvgCache } from "../src/svgCache.ts";
-import { mockCanvas, mockTwemojiFetch } from "./helpers.ts";
+import { mockCanvas, mockNotoFetch, mockOpenmojiFetch, mockTwemojiFetch } from "./helpers.ts";
 
 describe("emojiToImage", () => {
   let restoreOffscreenCanvas: (() => void) | undefined;
@@ -17,13 +17,28 @@ describe("emojiToImage", () => {
     vi.restoreAllMocks();
   });
 
-  test("returns an HTMLImageElement by default", async () => {
+  test("defaults to native and skips CDN fetch", async () => {
     restoreOffscreenCanvas = mockCanvas();
+    const fillText = vi.fn();
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      fillStyle: "",
+      fillRect: vi.fn(),
+      drawImage: vi.fn(),
+      fillText,
+      font: "",
+      textAlign: "",
+      textBaseline: "",
+      imageSmoothingEnabled: true,
+    } as unknown as CanvasRenderingContext2D);
+
+    const fetchImpl = vi.fn(mockTwemojiFetch());
     const image = await emojiToImage("😀", {
-      fetch: mockTwemojiFetch(),
+      fetch: fetchImpl,
       size: 32,
     });
 
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(fillText).toHaveBeenCalledWith("😀", 16, 16);
     expect(image).toBeInstanceOf(HTMLImageElement);
     expect(image.width).toBe(32);
     expect(image.height).toBe(32);
@@ -32,7 +47,6 @@ describe("emojiToImage", () => {
   test("returns a Blob when format is blob", async () => {
     restoreOffscreenCanvas = mockCanvas();
     const blob = await emojiToImage("😀", {
-      fetch: mockTwemojiFetch(),
       format: "blob",
     });
 
@@ -44,7 +58,6 @@ describe("emojiToImage", () => {
   test("returns a data URL when format is dataUrl", async () => {
     restoreOffscreenCanvas = mockCanvas();
     const dataUrl = await emojiToImage("😀", {
-      fetch: mockTwemojiFetch(),
       format: "dataUrl",
     });
 
@@ -52,14 +65,27 @@ describe("emojiToImage", () => {
     expect(dataUrl.startsWith("data:image/png;base64,")).toBe(true);
   });
 
-  test("reuses cached SVG between calls", async () => {
+  test("reuses cached SVG between CDN calls", async () => {
     restoreOffscreenCanvas = mockCanvas();
     const fetchImpl = vi.fn(mockTwemojiFetch());
 
-    await emojiToImage("😀", { fetch: fetchImpl, format: "blob" });
-    await emojiToImage("😀", { fetch: fetchImpl, format: "dataUrl" });
+    await emojiToImage("😀", { source: "twemoji", fetch: fetchImpl, format: "blob" });
+    await emojiToImage("😀", { source: "twemoji", fetch: fetchImpl, format: "dataUrl" });
 
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  test("fetches OpenMoji and Noto presets", async () => {
+    restoreOffscreenCanvas = mockCanvas();
+
+    const openmojiFetch = vi.fn(mockOpenmojiFetch());
+    const notoFetch = vi.fn(mockNotoFetch());
+
+    await emojiToImage("😀", { source: "openmoji", fetch: openmojiFetch, format: "blob" });
+    await emojiToImage("😀", { source: "noto", fetch: notoFetch, format: "blob" });
+
+    expect(openmojiFetch).toHaveBeenCalledTimes(1);
+    expect(notoFetch).toHaveBeenCalledTimes(1);
   });
 
   test("passes background color through to rasterization", async () => {
@@ -77,7 +103,6 @@ describe("emojiToImage", () => {
     } as unknown as CanvasRenderingContext2D);
 
     await emojiToImage("😀", {
-      fetch: mockTwemojiFetch(),
       format: "blob",
       background: "#000000",
     });
@@ -125,7 +150,6 @@ describe("emojiToImage", () => {
     vi.stubGlobal("devicePixelRatio", 1);
 
     const image = await emojiToImage("😀", {
-      fetch: mockTwemojiFetch(),
       size: 40,
       responsive: true,
     });
@@ -141,7 +165,6 @@ describe("emojiToImage", () => {
     vi.stubGlobal("devicePixelRatio", 2);
 
     const image = await emojiToImage("😀", {
-      fetch: mockTwemojiFetch(),
       size: 48,
       srcSet: [24, 48],
       sizes: "(max-width: 600px) 24px, 48px",
@@ -160,7 +183,6 @@ describe("emojiToImage", () => {
 
     await expect(
       emojiToImage("😀", {
-        fetch: mockTwemojiFetch(),
         format: "blob",
         srcSet: [24, 48],
       }),
