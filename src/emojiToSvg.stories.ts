@@ -8,10 +8,11 @@ interface EmojiToSvgStoryArgs {
   xmlDeclaration: boolean;
   pixelate: number;
   cache: boolean;
-  sourceMode: "twemoji" | "custom";
+  sourceMode: "twemoji" | "openmoji" | "noto" | "custom";
   responsiveMode: "fixed" | "intrinsic" | "relative" | "fill";
   customBaseUrl: string;
   customExt: string;
+  customCodePointFormat: "twemoji" | "openmoji" | "noto";
 }
 
 const meta = {
@@ -27,6 +28,7 @@ const meta = {
     responsiveMode: "fixed",
     customBaseUrl: "https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0/assets/svg",
     customExt: ".svg",
+    customCodePointFormat: "twemoji",
   },
   argTypes: {
     emoji: {
@@ -58,8 +60,9 @@ const meta = {
     },
     sourceMode: {
       control: "select",
-      options: ["twemoji", "custom"],
-      description: 'Asset source. `"twemoji"` uses the default jsDelivr CDN.',
+      options: ["twemoji", "openmoji", "noto", "custom"],
+      description:
+        'Asset source. CDN presets use pinned jsDelivr URLs. `"custom"` uses baseUrl + optional codePointFormat.',
     },
     customBaseUrl: {
       control: "text",
@@ -72,12 +75,18 @@ const meta = {
         'File extension appended to the codepoint when sourceMode is `custom`. Default: ".svg".',
       if: { arg: "sourceMode", eq: "custom" },
     },
+    customCodePointFormat: {
+      control: "select",
+      options: ["twemoji", "openmoji", "noto"],
+      description: "Filename stem style for custom sources.",
+      if: { arg: "sourceMode", eq: "custom" },
+    },
   },
   parameters: {
     docs: {
       description: {
         component: `
-Fetches Twemoji SVG artwork for an emoji and returns inline SVG markup.
+Fetches CDN SVG artwork for an emoji and returns inline SVG markup. Defaults to Twemoji; OpenMoji and Noto presets are also available.
 
 ## Usage
 
@@ -134,6 +143,13 @@ const svg = await emojiToSvg("👾", { size: 96, pixelate: 8 });
 // Incompatible with responsive — throws IncompatibleOptionsError
 \`\`\`
 
+**OpenMoji / Noto presets**
+
+\`\`\`ts
+const openmoji = await emojiToSvg("😀", { source: "openmoji" });
+const noto = await emojiToSvg("😀", { source: "noto" });
+\`\`\`
+
 **Custom CDN source**
 
 \`\`\`ts
@@ -141,6 +157,7 @@ const svg = await emojiToSvg("😀", {
   source: {
     baseUrl: "https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0/assets/svg",
     ext: ".svg",
+    codePointFormat: "twemoji",
   },
 });
 \`\`\`
@@ -150,7 +167,7 @@ const svg = await emojiToSvg("😀", {
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
 | \`size\` | \`number\` | \`72\` | Width and height in pixels |
-| \`source\` | \`"twemoji" \\| { baseUrl, ext? }\` | \`"twemoji"\` | CDN or custom asset base |
+| \`source\` | \`"twemoji" \\| "openmoji" \\| "noto" \\| { baseUrl, ext?, codePointFormat? }\` | \`"twemoji"\` | CDN preset or custom asset base |
 | \`fetch\` | \`typeof fetch\` | \`globalThis.fetch\` | Custom fetch (not exposed here) |
 | \`cache\` | \`boolean\` | \`true\` | Cache fetched SVG text |
 | \`signal\` | \`AbortSignal\` | — | Abort in-flight fetch (not exposed here) |
@@ -171,9 +188,10 @@ function resolveSource(args: EmojiToSvgStoryArgs): EmojiSource {
     return {
       baseUrl: args.customBaseUrl,
       ext: args.customExt || ".svg",
+      codePointFormat: args.customCodePointFormat,
     };
   }
-  return "twemoji";
+  return args.sourceMode;
 }
 
 function resolveResponsive(args: EmojiToSvgStoryArgs) {

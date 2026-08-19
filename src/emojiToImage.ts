@@ -8,8 +8,15 @@ import {
   resolveRenderSize,
   resolveResponsiveImage,
 } from "./responsive.ts";
+import { DEFAULT_IMAGE_SOURCE } from "./sources.ts";
 import { blobToDataUrl, loadImageFromUrl, svgToDataUrl, svgToImageBlob } from "./svgToImage.ts";
-import type { EmojiImageFormat, EmojiToImageOptions, EmojiToImageResult } from "./types.ts";
+import type {
+  EmojiImageFormat,
+  EmojiImageSource,
+  EmojiSource,
+  EmojiToImageOptions,
+  EmojiToImageResult,
+} from "./types.ts";
 
 interface RenderEmojiBlobOptions {
   emoji: string;
@@ -17,11 +24,19 @@ interface RenderEmojiBlobOptions {
   mimeType: "image/png" | "image/webp";
   background: string | null;
   pixelate?: number;
-  source?: EmojiToImageOptions["source"];
+  source: EmojiImageSource;
   fontFamily?: string;
   fetch?: typeof fetch;
   cache?: boolean;
   signal?: AbortSignal;
+}
+
+function isNativeSource(source: EmojiImageSource): source is "native" {
+  return source === "native";
+}
+
+function asCdnSource(source: EmojiImageSource): EmojiSource {
+  return source as EmojiSource;
 }
 
 async function renderEmojiBlob(options: RenderEmojiBlobOptions): Promise<Blob> {
@@ -38,7 +53,7 @@ async function renderEmojiBlob(options: RenderEmojiBlobOptions): Promise<Blob> {
     signal,
   } = options;
 
-  if (source === "native") {
+  if (isNativeSource(source)) {
     return nativeEmojiToImageBlob({
       emoji,
       size: renderSize,
@@ -51,7 +66,7 @@ async function renderEmojiBlob(options: RenderEmojiBlobOptions): Promise<Blob> {
 
   const svg = await emojiToSvg(emoji, {
     size: renderSize,
-    source,
+    source: asCdnSource(source),
     fetch,
     cache,
     signal,
@@ -88,7 +103,7 @@ async function renderEmojiImageElement(
     mimeType = "image/png",
     background = null,
     pixelate,
-    source,
+    source = DEFAULT_IMAGE_SOURCE,
     fontFamily,
     responsive,
     srcSet,
@@ -171,7 +186,7 @@ export async function emojiToImage<TFormat extends EmojiImageFormat = "image">(
     background = null,
     pixelate,
     size = 72,
-    source,
+    source = DEFAULT_IMAGE_SOURCE,
     fontFamily,
     responsive,
     srcSet,
@@ -204,7 +219,7 @@ export async function emojiToImage<TFormat extends EmojiImageFormat = "image">(
   const resolved = resolveResponsiveImage(responsive, size);
   const renderSize = resolveRenderSize(size, resolved.dpr);
 
-  if (source === "native") {
+  if (isNativeSource(source)) {
     const nativeOptions = {
       emoji,
       size: renderSize,
@@ -223,7 +238,7 @@ export async function emojiToImage<TFormat extends EmojiImageFormat = "image">(
 
   const svg = await emojiToSvg(emoji, {
     size: renderSize,
-    source,
+    source: asCdnSource(source),
     fetch,
     cache,
     signal,

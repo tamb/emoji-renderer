@@ -1,9 +1,8 @@
 import { emojiToCodePoint } from "./codepoint.ts";
 import { EmojiNotFoundError } from "./errors.ts";
+import { buildAssetUrl, DEFAULT_SVG_SOURCE } from "./sources.ts";
 import { sharedSvgCache, type SvgCache } from "./svgCache.ts";
 import type { EmojiSource } from "./types.ts";
-
-const DEFAULT_TWEMOJI_BASE = "https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0/assets/svg";
 
 export interface FetchSvgOptions {
   emoji: string;
@@ -14,20 +13,14 @@ export interface FetchSvgOptions {
   cacheStore?: SvgCache;
 }
 
-export function buildSvgUrl(codePoint: string, source: EmojiSource = "twemoji"): string {
-  if (source === "twemoji") {
-    return `${DEFAULT_TWEMOJI_BASE}/${codePoint}.svg`;
-  }
-
-  const ext = source.ext ?? ".svg";
-  const normalizedBase = source.baseUrl.replace(/\/$/, "");
-  return `${normalizedBase}/${codePoint}${ext}`;
+export function buildSvgUrl(codePoint: string, source: EmojiSource = DEFAULT_SVG_SOURCE): string {
+  return buildAssetUrl(codePoint, source);
 }
 
 export async function fetchSvgText(options: FetchSvgOptions): Promise<string> {
   const {
     emoji,
-    source = "twemoji",
+    source = DEFAULT_SVG_SOURCE,
     fetch: fetchImpl = globalThis.fetch,
     cache = true,
     signal,
@@ -35,7 +28,7 @@ export async function fetchSvgText(options: FetchSvgOptions): Promise<string> {
   } = options;
 
   const codePoint = emojiToCodePoint(emoji);
-  const url = buildSvgUrl(codePoint, source);
+  const url = buildAssetUrl(codePoint, source);
 
   if (cache) {
     const cached = cacheStore.get(url);

@@ -4,6 +4,12 @@ export const SAMPLE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 
 
 export const FAMILY_EMOJI = "👨‍👩‍👧";
 export const FAMILY_CODEPOINT = "1f468-200d-1f469-200d-1f467";
+export const FAMILY_CODEPOINT_OPENMOJI = "1F468-200D-1F469-200D-1F467";
+export const FAMILY_CODEPOINT_NOTO = "emoji_u1f468_200d_1f469_200d_1f467";
+
+export const TWEMOJI_BASE = "https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0/assets/svg";
+export const OPENMOJI_BASE = "https://cdn.jsdelivr.net/npm/openmoji@17.0.0/color/svg";
+export const NOTO_BASE = "https://cdn.jsdelivr.net/gh/googlefonts/noto-emoji@v2.047/svg";
 
 export function requestUrl(input: RequestInfo | URL): string {
   if (typeof input === "string") {
@@ -37,8 +43,22 @@ export function createMockFetch(responses: Record<string, string | number> = {})
 
 export function mockTwemojiFetch(svg = SAMPLE_SVG): typeof fetch {
   return createMockFetch({
-    [`https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0/assets/svg/1f600.svg`]: svg,
-    [`https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0/assets/svg/${FAMILY_CODEPOINT}.svg`]: svg,
+    [`${TWEMOJI_BASE}/1f600.svg`]: svg,
+    [`${TWEMOJI_BASE}/${FAMILY_CODEPOINT}.svg`]: svg,
+  });
+}
+
+export function mockOpenmojiFetch(svg = SAMPLE_SVG): typeof fetch {
+  return createMockFetch({
+    [`${OPENMOJI_BASE}/1F600.svg`]: svg,
+    [`${OPENMOJI_BASE}/${FAMILY_CODEPOINT_OPENMOJI}.svg`]: svg,
+  });
+}
+
+export function mockNotoFetch(svg = SAMPLE_SVG): typeof fetch {
+  return createMockFetch({
+    [`${NOTO_BASE}/emoji_u1f600.svg`]: svg,
+    [`${NOTO_BASE}/${FAMILY_CODEPOINT_NOTO}.svg`]: svg,
   });
 }
 

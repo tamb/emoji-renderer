@@ -1,8 +1,14 @@
+export type CodePointFormat = "twemoji" | "openmoji" | "noto";
+
+export type EmojiCdnPreset = "twemoji" | "openmoji" | "noto";
+
 export type EmojiSource =
-  | "twemoji"
+  | EmojiCdnPreset
   | {
       baseUrl: string;
       ext?: string;
+      /** Filename stem style derived from the Twemoji-style codepoint. Default: `"twemoji"`. */
+      codePointFormat?: CodePointFormat;
     };
 
 export interface EmojiBaseOptions {
