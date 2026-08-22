@@ -78,7 +78,7 @@ const meta = {
       control: "select",
       options: ["native", "twemoji", "openmoji", "noto", "custom"],
       description:
-        'Asset source. `"native"` (default) draws the system emoji font. CDN presets use pinned jsDelivr URLs.',
+        'Asset source. `"native"` (default) draws the system emoji font and can clip some glyphs on mobile. CDN presets use pinned jsDelivr URLs.',
     },
     fontFamily: {
       control: "text",
@@ -122,6 +122,8 @@ const meta = {
       description: {
         component: `
 Fetches CDN SVG artwork (or draws native system emoji), rasterizes via canvas, and returns an image.
+
+**Native clipping:** \`"native"\` (the default) draws the system emoji font onto a square canvas. Some glyphs can look cropped or cut in half — especially on mobile, where Apple Color Emoji and other platform fonts sit outside the typographic box. Use a CDN source (\`"twemoji"\`, \`"openmoji"\`, \`"noto"\`) for fitted, uncropped artwork.
 
 ## Usage
 
@@ -214,7 +216,7 @@ const image = await emojiToImage("👾", {
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
 | \`size\` | \`number\` | \`72\` | Width and height in pixels |
-| \`source\` | \`"native" \\| "twemoji" \\| "openmoji" \\| "noto" \\| { baseUrl, ext?, codePointFormat? }\` | \`"native"\` | System font, CDN preset, or custom asset base |
+| \`source\` | \`"native" \\| "twemoji" \\| "openmoji" \\| "noto" \\| { baseUrl, ext?, codePointFormat? }\` | \`"native"\` | System font (may clip on mobile), CDN preset, or custom asset base |
 | \`fetch\` | \`typeof fetch\` | \`globalThis.fetch\` | Custom fetch (not exposed here) |
 | \`cache\` | \`boolean\` | \`true\` | Cache fetched SVG text |
 | \`signal\` | \`AbortSignal\` | — | Abort in-flight fetch (not exposed here) |

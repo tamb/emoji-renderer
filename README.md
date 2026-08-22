@@ -92,7 +92,15 @@ const custom = await emojiToSvg("😀", {
 | `srcSet`         | `emojiToImage` | off                                 | Logical widths for `<img srcset>` (`format` image)                 |
 | `sizes`          | `emojiToImage` | —                                   | Optional `<img sizes>` when `srcSet` is set                        |
 
-\* `"native"` applies to `emojiToImage` only. It draws the platform emoji font via canvas (no CDN fetch). Appearance varies by OS/browser.
+\* `"native"` applies to `emojiToImage` only. It draws the platform emoji font via canvas (no CDN fetch). Appearance varies by OS/browser; some glyphs may be clipped (see below).
+
+### Native source clipping
+
+When `source` is `"native"` (the image default), the emoji is drawn as text onto a square canvas at about 85% of `size` and centered with `textBaseline: "middle"`. That centers the typographic em-box, not the visible glyph.
+
+Platform emoji fonts — especially Apple Color Emoji on iOS and other mobile browsers — often sit outside that box. Tall or “extra” glyphs (crowns, hats, some composites) can look cropped or cut in half. The same emoji can look fine on desktop and clipped on a phone.
+
+CDN sources (`"twemoji"`, `"openmoji"`, `"noto"`) draw fitted SVG assets into the box and avoid this.
 
 ### Responsive output
 
