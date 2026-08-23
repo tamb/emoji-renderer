@@ -1,6 +1,6 @@
 {
   "name": "emoji-renderer",
-  "version": "0.1.1-rc.0",
+  "version": "1.0.0",
   "description": "Convert emoji to SVG markup or raster images with native, Twemoji, OpenMoji, Noto, and Fluent sources.",
   "keywords": [
     "canvas",
@@ -50,6 +50,7 @@
     "build": "vp pack",
     "dev": "vp pack --watch",
     "test": "vp test --project unit",
+    "test:node": "vp test --project node",
     "test:browser": "vp test --project browser",
     "test:browser:mobile": "vp test --project browser-mobile",
     "test:all": "vp test",
@@ -65,21 +66,35 @@
     "@twemoji/api": "^17.0.2"
   },
   "devDependencies": {
-    "@storybook/addon-docs": "^10.4.6",
-    "@storybook/html-vite": "^10.4.6",
+    "@napi-rs/canvas": "^0.1.80",
+    "@resvg/resvg-js": "^2.6.2",
+    "@storybook/addon-docs": "^10.5.10",
+    "@storybook/html-vite": "^10.5.10",
     "@types/node": "^26.1.1",
     "@vitest/browser-playwright": "^4.1.10",
     "@vitest/coverage-v8": "^4.1.10",
     "bumpp": "^11.1.0",
     "happy-dom": "^20.11.1",
     "playwright": "^1.62.0",
-    "storybook": "^10.4.6",
+    "storybook": "^10.5.10",
     "typescript": "^7.0.2",
-    "vite": "npm:@voidzero-dev/vite-plus-core@0.2.6",
-    "vite-plus": "0.2.6"
+    "vite": "npm:@voidzero-dev/vite-plus-core@0.2.9",
+    "vite-plus": "0.2.9"
+  },
+  "peerDependencies": {
+    "@napi-rs/canvas": ">=0.1.0",
+    "@resvg/resvg-js": ">=2.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@napi-rs/canvas": {
+      "optional": true
+    },
+    "@resvg/resvg-js": {
+      "optional": true
+    }
   },
   "overrides": {
-    "vite": "npm:@voidzero-dev/vite-plus-core@0.2.6"
+    "vite": "npm:@voidzero-dev/vite-plus-core@0.2.9"
   },
   "devEngines": {
     "packageManager": {
@@ -87,5 +102,8 @@
       "version": ">=10.0.0",
       "onFail": "download"
     }
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

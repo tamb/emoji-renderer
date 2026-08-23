@@ -32,6 +32,10 @@ export interface EmojiBaseOptions {
   fetch?: typeof fetch;
   cache?: boolean;
   signal?: AbortSignal;
+  /** Per-request fetch timeout in milliseconds. Default: 8000. Composed with `signal`. */
+  timeout?: number;
+  /** Same-source retry count for transient fetch failures (network, 429, 5xx). Default: 2. */
+  retries?: number;
 }
 
 export type ResponsiveSvgMode = "intrinsic" | "relative" | "fill";

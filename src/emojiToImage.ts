@@ -106,7 +106,7 @@ async function blobToHtmlImage(blob: Blob, renderSize: number): Promise<HTMLImag
   const objectUrl = URL.createObjectURL(blob);
 
   try {
-    const image = await loadImageFromUrl(objectUrl);
+    const image = (await loadImageFromUrl(objectUrl)) as HTMLImageElement;
     image.width = renderSize;
     image.height = renderSize;
     return image;
@@ -170,7 +170,7 @@ async function renderEmojiImageElement(
       variants.find((_variant, index) => widths[index] === defaultWidth) ??
       variants[variants.length - 1]!;
 
-    const image = await loadImageFromUrl(defaultVariant.url);
+    const image = (await loadImageFromUrl(defaultVariant.url)) as HTMLImageElement;
     image.src = defaultVariant.url;
     image.srcset = variants.map((variant) => `${variant.url} ${variant.physicalWidth}w`).join(", ");
 
@@ -286,6 +286,7 @@ export type {
 export {
   InvalidEmojiError,
   EmojiNotFoundError,
+  EmojiFetchError,
   RasterizeError,
   IncompatibleOptionsError,
 } from "./errors.ts";

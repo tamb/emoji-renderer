@@ -33,7 +33,7 @@ export default defineConfig({
     },
     exports: false,
     deps: {
-      neverBundle: [/^@twemoji\/api$/],
+      neverBundle: [/^@twemoji\/api$/, /^@napi-rs\/canvas$/, /^@resvg\/resvg-js$/],
     },
   },
   test: {
@@ -56,6 +56,15 @@ export default defineConfig({
           name: "unit",
           environment: "happy-dom",
           include: ["tests/**/*.test.ts"],
+          exclude: ["tests/node/**"],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "node",
+          environment: "node",
+          include: ["tests/node/**/*.test.ts"],
         },
       },
       {

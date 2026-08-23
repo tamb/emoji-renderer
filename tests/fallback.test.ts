@@ -1,5 +1,10 @@
 import { describe, expect, test } from "vite-plus/test";
-import { EmojiNotFoundError, IncompatibleOptionsError, InvalidEmojiError } from "../src/errors.ts";
+import {
+  EmojiFetchError,
+  EmojiNotFoundError,
+  IncompatibleOptionsError,
+  InvalidEmojiError,
+} from "../src/errors.ts";
 import { isAbortError, shouldTryNextSource, throwIfAborted } from "../src/fallback.ts";
 import { assertCdnFallbacks, EMOJI_CDN_PRESETS } from "../src/sources.ts";
 
@@ -15,6 +20,7 @@ describe("fallback helpers", () => {
 
   test("shouldTryNextSource retries fetch misses and network errors", () => {
     expect(shouldTryNextSource(new EmojiNotFoundError("😀", "https://example.com"))).toBe(true);
+    expect(shouldTryNextSource(new EmojiFetchError("😀", "https://example.com", 503))).toBe(true);
     expect(shouldTryNextSource(new TypeError("Failed to fetch"))).toBe(true);
     expect(shouldTryNextSource(new Error("fetch is not available in this environment"))).toBe(true);
     expect(shouldTryNextSource(new InvalidEmojiError())).toBe(false);

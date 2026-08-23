@@ -44,14 +44,20 @@ describe("Fluent source mapping", () => {
   });
 
   test("builds pinned jsDelivr URLs for color, flat, high-contrast, and 3d", () => {
-    expect(buildAssetUrl("1f600", "fluent")).toBe(FLUENT_GRINNING_COLOR);
-    expect(buildAssetUrl("1f600", { preset: "fluent", style: "flat" })).toBe(FLUENT_GRINNING_FLAT);
-    expect(buildAssetUrl("1f600", { preset: "fluent", style: "high-contrast" })).toBe(
+    expect(buildFluentAssetUrl("1f600", "fluent")).toBe(FLUENT_GRINNING_COLOR);
+    expect(buildFluentAssetUrl("1f600", { preset: "fluent", style: "flat" })).toBe(
+      FLUENT_GRINNING_FLAT,
+    );
+    expect(buildFluentAssetUrl("1f600", { preset: "fluent", style: "high-contrast" })).toBe(
       FLUENT_GRINNING_HC,
     );
-    expect(buildAssetUrl("1f44d", { preset: "fluent", style: "3d" })).toBe(FLUENT_THUMBS_3D);
-    expect(buildAssetUrl("1f44d", "fluent")).toBe(FLUENT_THUMBS_DEFAULT);
-    expect(buildAssetUrl("1f44d-1f3fb", "fluent")).toBe(FLUENT_THUMBS_LIGHT);
+    expect(buildFluentAssetUrl("1f44d", { preset: "fluent", style: "3d" })).toBe(FLUENT_THUMBS_3D);
+    expect(buildFluentAssetUrl("1f44d", "fluent")).toBe(FLUENT_THUMBS_DEFAULT);
+    expect(buildFluentAssetUrl("1f44d-1f3fb", "fluent")).toBe(FLUENT_THUMBS_LIGHT);
+  });
+
+  test("buildAssetUrl rejects Fluent sources synchronously", () => {
+    expect(() => buildAssetUrl("1f600", "fluent")).toThrow(/does not resolve Fluent sources/);
   });
 
   test("uses a custom Fluent asset root", () => {
@@ -64,11 +70,11 @@ describe("Fluent source mapping", () => {
   });
 
   test("throws EmojiNotFoundError for unmapped emoji and high-contrast skin tones", () => {
-    expect(() => buildAssetUrl("1f468-200d-1f469-200d-1f467", "fluent")).toThrow(
+    expect(() => buildFluentAssetUrl("1f468-200d-1f469-200d-1f467", "fluent")).toThrow(
       EmojiNotFoundError,
     );
     expect(() =>
-      buildAssetUrl("1f44d-1f3fb", { preset: "fluent", style: "high-contrast" }),
+      buildFluentAssetUrl("1f44d-1f3fb", { preset: "fluent", style: "high-contrast" }),
     ).toThrow(EmojiNotFoundError);
   });
 

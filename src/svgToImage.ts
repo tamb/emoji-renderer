@@ -1,4 +1,19 @@
+import {
+  blobToDataUrl,
+  canvasToBlob,
+  createCanvas,
+  get2dContext,
+  loadImageFromUrl,
+} from "./canvasEnv.ts";
 import { RasterizeError } from "./errors.ts";
+
+export {
+  blobToDataUrl,
+  canvasToBlob,
+  createCanvas,
+  get2dContext,
+  loadImageFromUrl,
+} from "./canvasEnv.ts";
 
 export interface SvgToImageOptions {
   svg: string;
@@ -9,72 +24,15 @@ export interface SvgToImageOptions {
   pixelate?: number;
 }
 
-export function createCanvas(size: number): HTMLCanvasElement | OffscreenCanvas {
-  if (typeof OffscreenCanvas !== "undefined") {
-    return new OffscreenCanvas(size, size);
-  }
-
-  if (typeof document !== "undefined") {
-    const canvas = document.createElement("canvas");
-    canvas.width = size;
-    canvas.height = size;
-    return canvas;
-  }
-
-  throw new RasterizeError("Canvas is not available in this environment");
+interface DrawableContext {
+  fillStyle: string | CanvasGradient | CanvasPattern;
+  fillRect(x: number, y: number, width: number, height: number): void;
+  drawImage(image: CanvasImageSource, ...args: number[]): void;
+  imageSmoothingEnabled: boolean;
 }
 
-export function get2dContext(
-  canvas: HTMLCanvasElement | OffscreenCanvas,
-): CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D {
-  const context = canvas.getContext("2d");
-  if (context === null) {
-    throw new RasterizeError("Unable to acquire a 2D canvas context");
-  }
-  return context;
-}
-
-export function loadImageFromUrl(url: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = () => reject(new RasterizeError("Failed to load SVG image"));
-    image.src = url;
-  });
-}
-
-export function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        resolve(reader.result);
-        return;
-      }
-      reject(new RasterizeError("Failed to read blob as data URL"));
-    };
-    reader.onerror = () => reject(new RasterizeError("Failed to read blob as data URL"));
-    reader.readAsDataURL(blob);
-  });
-}
-
-export async function canvasToBlob(
-  canvas: HTMLCanvasElement | OffscreenCanvas,
-  mimeType: "image/png" | "image/webp",
-): Promise<Blob> {
-  if ("convertToBlob" in canvas) {
-    return canvas.convertToBlob({ type: mimeType });
-  }
-
-  return new Promise((resolve, reject) => {
-    (canvas as HTMLCanvasElement).toBlob((blob) => {
-      if (blob === null) {
-        reject(new RasterizeError("Canvas toBlob returned null"));
-        return;
-      }
-      resolve(blob);
-    }, mimeType);
-  });
+function asDrawableContext(context: unknown): DrawableContext {
+  return context as DrawableContext;
 }
 
 function svgMarkupToDataUrl(svg: string): string {
@@ -87,26 +45,27 @@ function svgMarkupToDataUrl(svg: string): string {
   return `data:image/svg+xml;charset=utf-8,${encoded}`;
 }
 
-export function drawImageToContext(
-  context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+export async function drawImageToContext(
+  context: unknown,
   image: CanvasImageSource,
   size: number,
   background: string | null,
   pixelate?: number,
-): void {
+): Promise<void> {
+  const ctx = asDrawableContext(context);
   const blockSize = pixelate ?? 1;
   if (blockSize < 2) {
     if (background !== null) {
-      context.fillStyle = background;
-      context.fillRect(0, 0, size, size);
+      ctx.fillStyle = background;
+      ctx.fillRect(0, 0, size, size);
     }
-    context.drawImage(image, 0, 0, size, size);
+    ctx.drawImage(image, 0, 0, size, size);
     return;
   }
 
   const smallSize = Math.max(1, Math.floor(size / blockSize));
-  const scratch = createCanvas(smallSize);
-  const scratchContext = get2dContext(scratch);
+  const scratch = await createCanvas(smallSize);
+  const scratchContext = asDrawableContext(get2dContext(scratch));
 
   if (background !== null) {
     scratchContext.fillStyle = background;
@@ -116,24 +75,24 @@ export function drawImageToContext(
   scratchContext.drawImage(image, 0, 0, smallSize, smallSize);
 
   if (background !== null) {
-    context.fillStyle = background;
-    context.fillRect(0, 0, size, size);
+    ctx.fillStyle = background;
+    ctx.fillRect(0, 0, size, size);
   }
 
-  context.imageSmoothingEnabled = false;
-  context.drawImage(scratch, 0, 0, smallSize, smallSize, 0, 0, size, size);
-  context.imageSmoothingEnabled = true;
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(scratch as CanvasImageSource, 0, 0, smallSize, smallSize, 0, 0, size, size);
+  ctx.imageSmoothingEnabled = true;
 }
 
 export async function svgToImageBlob(options: SvgToImageOptions): Promise<Blob> {
   const { svg, size = 72, mimeType = "image/png", background = null, pixelate } = options;
 
   try {
-    const image = await loadImageFromUrl(svgMarkupToDataUrl(svg));
-    const canvas = createCanvas(size);
+    const image = (await loadImageFromUrl(svgMarkupToDataUrl(svg))) as CanvasImageSource;
+    const canvas = await createCanvas(size);
     const context = get2dContext(canvas);
 
-    drawImageToContext(context, image, size, background, pixelate);
+    await drawImageToContext(context, image, size, background, pixelate);
     return canvasToBlob(canvas, mimeType);
   } catch (error) {
     throw error instanceof RasterizeError ? error : new RasterizeError(String(error));
@@ -146,6 +105,10 @@ export async function svgToDataUrl(options: SvgToImageOptions): Promise<string> 
 }
 
 export async function svgToHtmlImage(options: SvgToImageOptions): Promise<HTMLImageElement> {
+  if (typeof Image === "undefined") {
+    throw new RasterizeError('format: "image" requires a browser DOM with HTMLImageElement');
+  }
+
   const blob = await svgToImageBlob(options);
   const objectUrl = URL.createObjectURL(blob);
 
@@ -153,7 +116,7 @@ export async function svgToHtmlImage(options: SvgToImageOptions): Promise<HTMLIm
     const image = await loadImageFromUrl(objectUrl);
     image.width = options.size ?? 72;
     image.height = options.size ?? 72;
-    return image;
+    return image as HTMLImageElement;
   } finally {
     URL.revokeObjectURL(objectUrl);
   }

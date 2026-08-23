@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { buildSvgUrl, fetchSvgText } from "../src/fetchSvg.ts";
-import { EmojiNotFoundError, IncompatibleOptionsError } from "../src/errors.ts";
+import { EmojiFetchError, EmojiNotFoundError, IncompatibleOptionsError } from "../src/errors.ts";
 import { buildAssetUrl, formatCodePoint, resolveSourceChain } from "../src/sources.ts";
 import { sharedSvgCache } from "../src/svgCache.ts";
 import {
@@ -83,7 +83,7 @@ describe("fetchSvgText", () => {
     }
   });
 
-  test("throws EmojiNotFoundError for failed responses", async () => {
+  test("throws EmojiNotFoundError for 404 responses", async () => {
     const fetchImpl = (async () => new Response(null, { status: 404 })) as typeof fetch;
 
     await expect(
@@ -91,8 +91,64 @@ describe("fetchSvgText", () => {
         emoji: "😀",
         fetch: fetchImpl,
         cache: false,
+        retries: 0,
       }),
     ).rejects.toBeInstanceOf(EmojiNotFoundError);
+  });
+
+  test("throws EmojiFetchError for 503 responses", async () => {
+    const fetchImpl = (async () => new Response(null, { status: 503 })) as typeof fetch;
+
+    await expect(
+      fetchSvgText({
+        emoji: "😀",
+        fetch: fetchImpl,
+        cache: false,
+        retries: 0,
+      }),
+    ).rejects.toBeInstanceOf(EmojiFetchError);
+  });
+
+  test("retries transient failures before falling back", async () => {
+    let attempts = 0;
+    const fetchImpl = vi.fn(async () => {
+      attempts += 1;
+      if (attempts === 1) {
+        return new Response(null, { status: 503 });
+      }
+      return new Response(SAMPLE_SVG, { status: 200 });
+    }) as typeof fetch;
+
+    const svg = await fetchSvgText({
+      emoji: "😀",
+      fetch: fetchImpl,
+      cache: false,
+      retries: 1,
+    });
+
+    expect(svg).toBe(SAMPLE_SVG);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  test("falls back to openmoji after repeated 503s", async () => {
+    const fetchImpl = vi.fn(
+      createMockFetch({
+        [`${TWEMOJI_BASE}/1f600.svg`]: 503,
+        [`${OPENMOJI_BASE}/1F600.svg`]: SAMPLE_SVG,
+      }),
+    );
+
+    const svg = await fetchSvgText({
+      emoji: "😀",
+      source: "twemoji",
+      fallbacks: ["openmoji"],
+      fetch: fetchImpl,
+      cache: false,
+      retries: 0,
+    });
+
+    expect(svg).toBe(SAMPLE_SVG);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
   test("does not reuse cache entries across different extensions", async () => {
@@ -207,6 +263,7 @@ describe("fetchSvgText", () => {
       fallbacks: ["openmoji"],
       fetch: fetchImpl,
       cache: false,
+      retries: 0,
     });
 
     expect(svg).toBe(SAMPLE_SVG);

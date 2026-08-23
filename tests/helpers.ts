@@ -1,5 +1,5 @@
 import { vi } from "vite-plus/test";
-import { FLUENT_ASSET_BASE } from "../src/fluent.ts";
+import { FLUENT_ASSET_BASE } from "../src/fluentMeta.ts";
 
 export const SAMPLE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="18" fill="#FFCC4D"/></svg>`;
 

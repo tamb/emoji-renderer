@@ -26,14 +26,12 @@ function assertEmoji(emoji: string): void {
   }
 }
 
-function renderNativeEmojiCanvas(
-  options: NativeToImageOptions,
-): HTMLCanvasElement | OffscreenCanvas {
+async function renderNativeEmojiCanvas(options: NativeToImageOptions) {
   const { emoji, size = 72, background = null, fontFamily = DEFAULT_EMOJI_FONT_FAMILY } = options;
 
   assertEmoji(emoji);
 
-  const canvas = createCanvas(size);
+  const canvas = await createCanvas(size);
   const context = get2dContext(canvas);
 
   if (background !== null) {
@@ -53,15 +51,15 @@ export async function nativeEmojiToImageBlob(options: NativeToImageOptions): Pro
   const { size = 72, mimeType = "image/png", background = null, pixelate } = options;
 
   try {
-    const sourceCanvas = renderNativeEmojiCanvas({
+    const sourceCanvas = await renderNativeEmojiCanvas({
       ...options,
       background: pixelate !== undefined && pixelate >= 2 ? null : background,
     });
 
     if (pixelate !== undefined && pixelate >= 2) {
-      const outputCanvas = createCanvas(size);
+      const outputCanvas = await createCanvas(size);
       const outputContext = get2dContext(outputCanvas);
-      drawImageToContext(
+      await drawImageToContext(
         outputContext,
         sourceCanvas as CanvasImageSource,
         size,
@@ -94,7 +92,7 @@ export async function nativeEmojiToHtmlImage(
     const image = await loadImageFromUrl(objectUrl);
     image.width = options.size ?? 72;
     image.height = options.size ?? 72;
-    return image;
+    return image as HTMLImageElement;
   } finally {
     URL.revokeObjectURL(objectUrl);
   }

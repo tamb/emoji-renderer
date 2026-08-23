@@ -1,4 +1,9 @@
 import { afterEach, describe, expect, test, vi } from "vite-plus/test";
+import {
+  NODE_CANVAS_INSTALL_HINT,
+  resetNodeCanvasModuleForTests,
+  setNodeCanvasLoaderForTests,
+} from "../src/canvasEnv.ts";
 import { RasterizeError } from "../src/errors.ts";
 import { svgToDataUrl, svgToHtmlImage, svgToImageBlob } from "../src/svgToImage.ts";
 import { mockCanvas, SAMPLE_SVG } from "./helpers.ts";
@@ -188,19 +193,29 @@ describe("svgToImage", () => {
   });
 
   test("throws RasterizeError when canvas is unavailable", async () => {
+    resetNodeCanvasModuleForTests();
+    setNodeCanvasLoaderForTests(async () => {
+      throw new Error("missing @napi-rs/canvas");
+    });
+
     const originalDocument = globalThis.document;
+    const originalOffscreenCanvas = globalThis.OffscreenCanvas;
     // @ts-expect-error test override
     delete globalThis.document;
     // @ts-expect-error test override
     delete globalThis.OffscreenCanvas;
 
-    await expect(
-      svgToImageBlob({
-        svg: SAMPLE_SVG,
-      }),
-    ).rejects.toThrow("Canvas is not available");
-
-    globalThis.document = originalDocument;
+    try {
+      await expect(
+        svgToImageBlob({
+          svg: SAMPLE_SVG,
+        }),
+      ).rejects.toThrow(NODE_CANVAS_INSTALL_HINT);
+    } finally {
+      globalThis.document = originalDocument;
+      globalThis.OffscreenCanvas = originalOffscreenCanvas;
+      resetNodeCanvasModuleForTests();
+    }
   });
 
   test("throws RasterizeError when FileReader returns a non-string", async () => {
