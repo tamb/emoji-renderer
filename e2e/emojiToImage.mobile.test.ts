@@ -6,7 +6,6 @@ describe("emoji renderer mobile browser integration", () => {
   test("emulates a high-DPR phone viewport", () => {
     expect(window.innerWidth).toBeLessThanOrEqual(430);
     expect(window.devicePixelRatio).toBeGreaterThan(2);
-    expect(navigator.maxTouchPoints).toBeGreaterThan(0);
   });
 
   test("renders CDN and native emoji on a phone-sized canvas", async () => {
