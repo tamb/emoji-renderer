@@ -18,4 +18,21 @@ describe("emojiToCodePoint", () => {
   test("throws InvalidEmojiError for non-string input", () => {
     expect(() => emojiToCodePoint(null as unknown as string)).toThrow(InvalidEmojiError);
   });
+
+  test("strips VS16 from text-default emoji such as coffin", () => {
+    expect(emojiToCodePoint("⚰️")).toBe("26b0");
+    expect(emojiToCodePoint("⚰")).toBe("26b0");
+  });
+
+  test("strips VS16 from keycap sequences", () => {
+    expect(emojiToCodePoint("1️⃣")).toBe("31-20e3");
+  });
+
+  test("preserves ZWJ family sequences", () => {
+    expect(emojiToCodePoint("👨‍👩‍👧")).toBe("1f468-200d-1f469-200d-1f467");
+  });
+
+  test("preserves VS16 in ZWJ sequences", () => {
+    expect(emojiToCodePoint("👨‍⚕️")).toBe("1f468-200d-2695-fe0f");
+  });
 });

@@ -16,7 +16,7 @@ type CodePointCdnPreset = Exclude<EmojiCdnPreset, "fluent">;
 const PRESET_BASES: Record<CodePointCdnPreset, string> = {
   twemoji: "https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0/assets/svg",
   openmoji: "https://cdn.jsdelivr.net/npm/openmoji@17.0.0/color/svg",
-  noto: "https://cdn.jsdelivr.net/gh/googlefonts/noto-emoji@v2.047/svg",
+  noto: "https://cdn.jsdelivr.net/gh/googlefonts/noto-emoji@v2.051/svg",
 };
 
 /**

@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Noto CDN preset pinned to `v2.051` (Unicode 17.0), up from `v2.047`.
+
+### Fixed
+
+- Text-default emoji with VS16 (coffin, keycaps, etc.) resolve to VS16-stripped CDN filenames instead of 404ing on `-fe0f` paths.
+
 ## [1.0.0] - 2026-08-23
 
 ### Added
