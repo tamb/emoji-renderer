@@ -8,7 +8,7 @@ describe("emoji renderer browser integration", () => {
     expect(svg).toContain("<svg");
     expect(svg).toContain('width="64"');
 
-    const image = await emojiToImage("😀", { source: "twemoji", size: 64, cache: false });
+    const image = await emojiToImage("😀", { size: 64, cache: false });
     expect(image).toBeInstanceOf(HTMLImageElement);
     expect(image.naturalWidth).toBeGreaterThan(0);
     expect(image.naturalHeight).toBeGreaterThan(0);
@@ -36,10 +36,11 @@ describe("emoji renderer browser integration", () => {
     expect(thumbs).toContain("<svg");
   });
 
-  test("defaults emojiToImage to native system emoji", async () => {
+  test("defaults emojiToImage to Twemoji", async () => {
     const dataUrl = await emojiToImage("🎉", {
       format: "dataUrl",
       size: 48,
+      cache: false,
     });
 
     expect(typeof dataUrl).toBe("string");

@@ -2,7 +2,7 @@ import { buildFluentAssetUrl, isFluentSource } from "./fluent.ts";
 import type { CodePointFormat, EmojiCdnPreset, EmojiSource } from "./types.ts";
 
 export const DEFAULT_SVG_SOURCE: EmojiCdnPreset = "twemoji";
-export const DEFAULT_IMAGE_SOURCE = "native" as const;
+export const DEFAULT_IMAGE_SOURCE: EmojiCdnPreset = "twemoji";
 
 type CodePointCdnPreset = Exclude<EmojiCdnPreset, "fluent">;
 

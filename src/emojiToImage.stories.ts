@@ -32,7 +32,7 @@ const meta = {
     background: "",
     pixelate: 0,
     cache: true,
-    sourceMode: "native",
+    sourceMode: "twemoji",
     fluentStyle: "color",
     fontFamily: "",
     responsive: false,
@@ -80,7 +80,7 @@ const meta = {
       control: "select",
       options: ["native", "twemoji", "openmoji", "noto", "fluent", "custom"],
       description:
-        'Asset source. `"native"` (default) draws the system emoji font and can clip some glyphs on mobile. CDN presets use pinned jsDelivr URLs. `"fluent"` uses Microsoft Fluent Emoji.',
+        'Asset source. `"twemoji"` (default) and other CDN presets use pinned jsDelivr URLs. `"native"` draws the system emoji font and can clip some glyphs on mobile. `"fluent"` uses Microsoft Fluent Emoji.',
     },
     fluentStyle: {
       control: "select",
@@ -129,16 +129,16 @@ const meta = {
     docs: {
       description: {
         component: `
-Fetches CDN SVG artwork (or draws native system emoji), rasterizes via canvas, and returns an image.
+Fetches CDN SVG artwork (or draws native system emoji), rasterizes via canvas, and returns an image. Defaults to Twemoji.
 
-**Native clipping:** \`"native"\` (the default) draws the system emoji font onto a square canvas. Some glyphs can look cropped or cut in half — especially on mobile, where Apple Color Emoji and other platform fonts sit outside the typographic box. Use a CDN source (\`"twemoji"\`, \`"openmoji"\`, \`"noto"\`) for fitted, uncropped artwork.
+**Native clipping:** \`"native"\` draws the system emoji font onto a square canvas. Some glyphs can look cropped or cut in half — especially on mobile, where Apple Color Emoji and other platform fonts sit outside the typographic box. The default \`"twemoji"\` source (and other CDN presets) draw fitted, uncropped artwork.
 
 ## Usage
 
 \`\`\`ts
 import { emojiToImage } from "emoji-renderer/emojiToImage";
 
-const image = await emojiToImage("😀", { size: 48 }); // native by default
+const image = await emojiToImage("😀", { size: 48 }); // Twemoji by default
 document.body.append(image);
 \`\`\`
 
@@ -152,7 +152,7 @@ const image = await emojiToImage("🎉");
 
 ## Examples
 
-**HTMLImageElement (default, native)**
+**HTMLImageElement (default, Twemoji)**
 
 \`\`\`ts
 const image = await emojiToImage("😀", { size: 48 });
@@ -225,7 +225,7 @@ const image = await emojiToImage("👾", {
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
 | \`size\` | \`number\` | \`72\` | Width and height in pixels |
-| \`source\` | \`"native" \\| "twemoji" \\| "openmoji" \\| "noto" \\| "fluent" \\| { preset: "fluent", style? } \\| { baseUrl, ext?, codePointFormat? }\` | \`"native"\` | System font (may clip on mobile), CDN preset, Fluent style, or custom asset base |
+| \`source\` | \`"native" \\| "twemoji" \\| "openmoji" \\| "noto" \\| "fluent" \\| { preset: "fluent", style? } \\| { baseUrl, ext?, codePointFormat? }\` | \`"twemoji"\` | CDN preset (default Twemoji), Fluent style, custom asset base, or system font |
 | \`fetch\` | \`typeof fetch\` | \`globalThis.fetch\` | Custom fetch (not exposed here) |
 | \`cache\` | \`boolean\` | \`true\` | Cache fetched SVG text |
 | \`signal\` | \`AbortSignal\` | — | Abort in-flight fetch (not exposed here) |

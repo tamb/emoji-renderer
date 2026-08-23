@@ -23,28 +23,15 @@ describe("emojiToImage", () => {
     vi.restoreAllMocks();
   });
 
-  test("defaults to native and skips CDN fetch", async () => {
+  test("defaults to Twemoji and fetches CDN SVG", async () => {
     restoreOffscreenCanvas = mockCanvas();
-    const fillText = vi.fn();
-    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
-      fillStyle: "",
-      fillRect: vi.fn(),
-      drawImage: vi.fn(),
-      fillText,
-      font: "",
-      textAlign: "",
-      textBaseline: "",
-      imageSmoothingEnabled: true,
-    } as unknown as CanvasRenderingContext2D);
-
     const fetchImpl = vi.fn(mockTwemojiFetch());
     const image = await emojiToImage("😀", {
       fetch: fetchImpl,
       size: 32,
     });
 
-    expect(fetchImpl).not.toHaveBeenCalled();
-    expect(fillText).toHaveBeenCalledWith("😀", 16, 16);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(image).toBeInstanceOf(HTMLImageElement);
     expect(image.width).toBe(32);
     expect(image.height).toBe(32);
@@ -54,6 +41,7 @@ describe("emojiToImage", () => {
     restoreOffscreenCanvas = mockCanvas();
     const blob = await emojiToImage("😀", {
       format: "blob",
+      fetch: mockTwemojiFetch(),
     });
 
     expect(blob).toBeInstanceOf(Blob);
@@ -65,6 +53,7 @@ describe("emojiToImage", () => {
     restoreOffscreenCanvas = mockCanvas();
     const dataUrl = await emojiToImage("😀", {
       format: "dataUrl",
+      fetch: mockTwemojiFetch(),
     });
 
     expect(typeof dataUrl).toBe("string");
@@ -120,6 +109,7 @@ describe("emojiToImage", () => {
     await emojiToImage("😀", {
       format: "blob",
       background: "#000000",
+      fetch: mockTwemojiFetch(),
     });
 
     expect(fillRect).toHaveBeenCalled();
@@ -167,6 +157,7 @@ describe("emojiToImage", () => {
     const image = await emojiToImage("😀", {
       size: 40,
       responsive: true,
+      fetch: mockTwemojiFetch(),
     });
 
     expect(image.style.width).toBe("40px");
@@ -184,6 +175,7 @@ describe("emojiToImage", () => {
       srcSet: [24, 48],
       sizes: "(max-width: 600px) 24px, 48px",
       responsive: { dpr: 2, display: "css" },
+      fetch: mockTwemojiFetch(),
     });
 
     expect(image.srcset).toContain(" 48w");
