@@ -8,7 +8,8 @@ interface EmojiToSvgStoryArgs {
   xmlDeclaration: boolean;
   pixelate: number;
   cache: boolean;
-  sourceMode: "twemoji" | "openmoji" | "noto" | "custom";
+  sourceMode: "twemoji" | "openmoji" | "noto" | "fluent" | "custom";
+  fluentStyle: "color" | "flat" | "high-contrast" | "3d";
   responsiveMode: "fixed" | "intrinsic" | "relative" | "fill";
   customBaseUrl: string;
   customExt: string;
@@ -25,6 +26,7 @@ const meta = {
     pixelate: 0,
     cache: true,
     sourceMode: "twemoji",
+    fluentStyle: "color",
     responsiveMode: "fixed",
     customBaseUrl: "https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0/assets/svg",
     customExt: ".svg",
@@ -60,9 +62,16 @@ const meta = {
     },
     sourceMode: {
       control: "select",
-      options: ["twemoji", "openmoji", "noto", "custom"],
+      options: ["twemoji", "openmoji", "noto", "fluent", "custom"],
       description:
-        'Asset source. CDN presets use pinned jsDelivr URLs. `"custom"` uses baseUrl + optional codePointFormat.',
+        'Asset source. CDN presets use pinned jsDelivr URLs. `"fluent"` uses Microsoft Fluent Emoji. `"custom"` uses baseUrl + optional codePointFormat.',
+    },
+    fluentStyle: {
+      control: "select",
+      options: ["color", "flat", "high-contrast", "3d"],
+      description:
+        'Fluent artwork style when sourceMode is `fluent`. Default: `"color"`. `"3d"` embeds a PNG in SVG.',
+      if: { arg: "sourceMode", eq: "fluent" },
     },
     customBaseUrl: {
       control: "text",
@@ -86,7 +95,7 @@ const meta = {
     docs: {
       description: {
         component: `
-Fetches CDN SVG artwork for an emoji and returns inline SVG markup. Defaults to Twemoji; OpenMoji and Noto presets are also available.
+Fetches CDN SVG artwork for an emoji and returns inline SVG markup. Defaults to Twemoji; OpenMoji, Noto, and Fluent presets are also available.
 
 ## Usage
 
@@ -143,11 +152,13 @@ const svg = await emojiToSvg("👾", { size: 96, pixelate: 8 });
 // Incompatible with responsive — throws IncompatibleOptionsError
 \`\`\`
 
-**OpenMoji / Noto presets**
+**OpenMoji / Noto / Fluent presets**
 
 \`\`\`ts
 const openmoji = await emojiToSvg("😀", { source: "openmoji" });
 const noto = await emojiToSvg("😀", { source: "noto" });
+const fluent = await emojiToSvg("😀", { source: "fluent" });
+const fluentFlat = await emojiToSvg("😀", { source: { preset: "fluent", style: "flat" } });
 \`\`\`
 
 **Custom CDN source**
@@ -167,7 +178,7 @@ const svg = await emojiToSvg("😀", {
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
 | \`size\` | \`number\` | \`72\` | Width and height in pixels |
-| \`source\` | \`"twemoji" \\| "openmoji" \\| "noto" \\| { baseUrl, ext?, codePointFormat? }\` | \`"twemoji"\` | CDN preset or custom asset base |
+| \`source\` | \`"twemoji" \\| "openmoji" \\| "noto" \\| "fluent" \\| { preset: "fluent", style? } \\| { baseUrl, ext?, codePointFormat? }\` | \`"twemoji"\` | CDN preset, Fluent style, or custom asset base |
 | \`fetch\` | \`typeof fetch\` | \`globalThis.fetch\` | Custom fetch (not exposed here) |
 | \`cache\` | \`boolean\` | \`true\` | Cache fetched SVG text |
 | \`signal\` | \`AbortSignal\` | — | Abort in-flight fetch (not exposed here) |
@@ -190,6 +201,9 @@ function resolveSource(args: EmojiToSvgStoryArgs): EmojiSource {
       ext: args.customExt || ".svg",
       codePointFormat: args.customCodePointFormat,
     };
+  }
+  if (args.sourceMode === "fluent") {
+    return args.fluentStyle === "color" ? "fluent" : { preset: "fluent", style: args.fluentStyle };
   }
   return args.sourceMode;
 }
@@ -287,6 +301,26 @@ export const ZwjSequence: Story = {
   args: {
     emoji: "👨‍👩‍👧",
     size: 64,
+  },
+  render: renderSvgPreview,
+};
+
+export const FluentColor: Story = {
+  name: "Fluent color",
+  args: {
+    emoji: "😀",
+    sourceMode: "fluent",
+    fluentStyle: "color",
+  },
+  render: renderSvgPreview,
+};
+
+export const FluentFlat: Story = {
+  name: "Fluent flat",
+  args: {
+    emoji: "👍",
+    sourceMode: "fluent",
+    fluentStyle: "flat",
   },
   render: renderSvgPreview,
 };

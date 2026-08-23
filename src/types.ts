@@ -1,15 +1,25 @@
 export type CodePointFormat = "twemoji" | "openmoji" | "noto";
 
-export type EmojiCdnPreset = "twemoji" | "openmoji" | "noto";
+export type FluentStyle = "flat" | "color" | "high-contrast" | "3d";
 
-export type EmojiSource =
-  | EmojiCdnPreset
-  | {
-      baseUrl: string;
-      ext?: string;
-      /** Filename stem style derived from the Twemoji-style codepoint. Default: `"twemoji"`. */
-      codePointFormat?: CodePointFormat;
-    };
+export type EmojiCdnPreset = "twemoji" | "openmoji" | "noto" | "fluent";
+
+export interface CustomEmojiSource {
+  baseUrl: string;
+  ext?: string;
+  /** Filename stem style derived from the Twemoji-style codepoint. Default: `"twemoji"`. */
+  codePointFormat?: CodePointFormat;
+}
+
+export interface FluentEmojiSource {
+  preset: "fluent";
+  /** Artwork style. Default: `"color"`. `"3d"` is PNG wrapped in SVG. */
+  style?: FluentStyle;
+  /** Override the pinned Fluent assets root. Trailing slashes are trimmed. */
+  baseUrl?: string;
+}
+
+export type EmojiSource = EmojiCdnPreset | CustomEmojiSource | FluentEmojiSource;
 
 export interface EmojiBaseOptions {
   source?: EmojiSource;

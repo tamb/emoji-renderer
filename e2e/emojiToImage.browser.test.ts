@@ -22,6 +22,20 @@ describe("emoji renderer browser integration", () => {
     expect(noto).toContain("<svg");
   });
 
+  test("fetches Fluent color and flat SVG presets", async () => {
+    const color = await emojiToSvg("😀", { source: "fluent", size: 48, cache: false });
+    const flat = await emojiToSvg("😀", {
+      source: { preset: "fluent", style: "flat" },
+      size: 48,
+      cache: false,
+    });
+    const thumbs = await emojiToSvg("👍🏻", { source: "fluent", size: 48, cache: false });
+
+    expect(color).toContain("<svg");
+    expect(flat).toContain("<svg");
+    expect(thumbs).toContain("<svg");
+  });
+
   test("defaults emojiToImage to native system emoji", async () => {
     const dataUrl = await emojiToImage("🎉", {
       format: "dataUrl",

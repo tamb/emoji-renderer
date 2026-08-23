@@ -1,10 +1,11 @@
 {
   "name": "emoji-renderer",
   "version": "0.1.1-rc.0",
-  "description": "Convert emoji to SVG markup or raster images with native, Twemoji, OpenMoji, and Noto sources.",
+  "description": "Convert emoji to SVG markup or raster images with native, Twemoji, OpenMoji, Noto, and Fluent sources.",
   "keywords": [
     "canvas",
     "emoji",
+    "fluent",
     "image",
     "native",
     "noto",
@@ -53,6 +54,7 @@
     "test:all": "vp test",
     "test:coverage": "vp test --project unit --coverage",
     "check": "vp check",
+    "generate:fluent-map": "node scripts/generate-fluent-map.mts",
     "storybook": "storybook dev -p 6006 --no-open",
     "build-storybook": "storybook build",
     "prepublishOnly": "vp run build",

@@ -260,6 +260,8 @@ export type {
   EmojiToImageResult,
   EmojiSource,
   EmojiBaseOptions,
+  FluentEmojiSource,
+  FluentStyle,
   ResponsiveImage,
   ResponsiveImageOptions,
 } from "./types.ts";

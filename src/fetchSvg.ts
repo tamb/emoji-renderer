@@ -1,7 +1,14 @@
 import { emojiToCodePoint } from "./codepoint.ts";
 import { EmojiNotFoundError } from "./errors.ts";
+import {
+  isFluentRasterStyle,
+  isFluentSource,
+  resolveFluentSource,
+  wrapPngAsSvg,
+} from "./fluent.ts";
 import { buildAssetUrl, DEFAULT_SVG_SOURCE } from "./sources.ts";
 import { sharedSvgCache, type SvgCache } from "./svgCache.ts";
+import { blobToDataUrl } from "./svgToImage.ts";
 import type { EmojiSource } from "./types.ts";
 
 export interface FetchSvgOptions {
@@ -28,7 +35,15 @@ export async function fetchSvgText(options: FetchSvgOptions): Promise<string> {
   } = options;
 
   const codePoint = emojiToCodePoint(emoji);
-  const url = buildAssetUrl(codePoint, source);
+  let url: string;
+  try {
+    url = buildAssetUrl(codePoint, source);
+  } catch (error) {
+    if (error instanceof EmojiNotFoundError) {
+      throw new EmojiNotFoundError(emoji, error.url);
+    }
+    throw error;
+  }
 
   if (cache) {
     const cached = cacheStore.get(url);
@@ -46,11 +61,17 @@ export async function fetchSvgText(options: FetchSvgOptions): Promise<string> {
     throw new EmojiNotFoundError(emoji, url);
   }
 
-  const svgText = await response.text();
+  const svgText = isFluent3dSource(source)
+    ? wrapPngAsSvg(await blobToDataUrl(await response.blob()))
+    : await response.text();
 
   if (cache) {
     cacheStore.set(url, svgText);
   }
 
   return svgText;
+}
+
+function isFluent3dSource(source: EmojiSource): boolean {
+  return isFluentSource(source) && isFluentRasterStyle(resolveFluentSource(source).style);
 }

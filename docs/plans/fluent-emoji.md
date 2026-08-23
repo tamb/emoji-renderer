@@ -1,6 +1,14 @@
 # Plan: Fluent Emoji source support
 
-Status: planned (not implemented). Track follow-up work for adding Microsoft [Fluent Emoji](https://github.com/microsoft/fluentui-emoji) as a first-class `source` preset alongside `native`, `twemoji`, `openmoji`, and `noto`.
+Status: implemented. Microsoft [Fluent Emoji](https://github.com/microsoft/fluentui-emoji) is a first-class `source` preset alongside `native`, `twemoji`, `openmoji`, and `noto`.
+
+Regenerate the committed map after bumping the pinned commit:
+
+```bash
+FLUENT_REF=<commit> npm run generate:fluent-map
+```
+
+Also update `FLUENT_COMMIT` in `src/fluent.ts`.
 
 ## Why defer
 

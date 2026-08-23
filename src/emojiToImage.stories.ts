@@ -10,7 +10,8 @@ interface EmojiToImageStoryArgs {
   background: string;
   pixelate: number;
   cache: boolean;
-  sourceMode: "native" | "twemoji" | "openmoji" | "noto" | "custom";
+  sourceMode: "native" | "twemoji" | "openmoji" | "noto" | "fluent" | "custom";
+  fluentStyle: "color" | "flat" | "high-contrast" | "3d";
   fontFamily: string;
   responsive: boolean;
   srcSet: string;
@@ -32,6 +33,7 @@ const meta = {
     pixelate: 0,
     cache: true,
     sourceMode: "native",
+    fluentStyle: "color",
     fontFamily: "",
     responsive: false,
     srcSet: "",
@@ -76,9 +78,15 @@ const meta = {
     },
     sourceMode: {
       control: "select",
-      options: ["native", "twemoji", "openmoji", "noto", "custom"],
+      options: ["native", "twemoji", "openmoji", "noto", "fluent", "custom"],
       description:
-        'Asset source. `"native"` (default) draws the system emoji font and can clip some glyphs on mobile. CDN presets use pinned jsDelivr URLs.',
+        'Asset source. `"native"` (default) draws the system emoji font and can clip some glyphs on mobile. CDN presets use pinned jsDelivr URLs. `"fluent"` uses Microsoft Fluent Emoji.',
+    },
+    fluentStyle: {
+      control: "select",
+      options: ["color", "flat", "high-contrast", "3d"],
+      description: 'Fluent artwork style when sourceMode is `fluent`. Default: `"color"`.',
+      if: { arg: "sourceMode", eq: "fluent" },
     },
     fontFamily: {
       control: "text",
@@ -199,6 +207,7 @@ document.body.append(image);
 const twemoji = await emojiToImage("😀", { source: "twemoji", size: 48 });
 const openmoji = await emojiToImage("😀", { source: "openmoji", size: 48 });
 const noto = await emojiToImage("😀", { source: "noto", size: 48 });
+const fluent = await emojiToImage("😀", { source: "fluent", size: 48 });
 \`\`\`
 
 **Pixelated output**
@@ -216,7 +225,7 @@ const image = await emojiToImage("👾", {
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
 | \`size\` | \`number\` | \`72\` | Width and height in pixels |
-| \`source\` | \`"native" \\| "twemoji" \\| "openmoji" \\| "noto" \\| { baseUrl, ext?, codePointFormat? }\` | \`"native"\` | System font (may clip on mobile), CDN preset, or custom asset base |
+| \`source\` | \`"native" \\| "twemoji" \\| "openmoji" \\| "noto" \\| "fluent" \\| { preset: "fluent", style? } \\| { baseUrl, ext?, codePointFormat? }\` | \`"native"\` | System font (may clip on mobile), CDN preset, Fluent style, or custom asset base |
 | \`fetch\` | \`typeof fetch\` | \`globalThis.fetch\` | Custom fetch (not exposed here) |
 | \`cache\` | \`boolean\` | \`true\` | Cache fetched SVG text |
 | \`signal\` | \`AbortSignal\` | — | Abort in-flight fetch (not exposed here) |
@@ -244,6 +253,9 @@ function resolveSource(args: EmojiToImageStoryArgs): EmojiImageSource {
       ext: args.customExt || ".svg",
       codePointFormat: args.customCodePointFormat,
     };
+  }
+  if (args.sourceMode === "fluent") {
+    return args.fluentStyle === "color" ? "fluent" : { preset: "fluent", style: args.fluentStyle };
   }
   return args.sourceMode;
 }
@@ -437,6 +449,31 @@ export const NativeSource: Story = {
 \`\`\`ts
 const image = await emojiToImage("😀", {
   source: "native",
+  size: 96,
+});
+\`\`\`
+        `,
+      },
+    },
+  },
+  render: renderImagePreview,
+};
+
+export const FluentSource: Story = {
+  name: "Fluent emoji",
+  args: {
+    emoji: "😀",
+    size: 96,
+    sourceMode: "fluent",
+    fluentStyle: "color",
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: `
+\`\`\`ts
+const image = await emojiToImage("😀", {
+  source: "fluent",
   size: 96,
 });
 \`\`\`

@@ -1,9 +1,12 @@
+import { buildFluentAssetUrl, isFluentSource } from "./fluent.ts";
 import type { CodePointFormat, EmojiCdnPreset, EmojiSource } from "./types.ts";
 
 export const DEFAULT_SVG_SOURCE: EmojiCdnPreset = "twemoji";
 export const DEFAULT_IMAGE_SOURCE = "native" as const;
 
-const PRESET_BASES: Record<EmojiCdnPreset, string> = {
+type CodePointCdnPreset = Exclude<EmojiCdnPreset, "fluent">;
+
+const PRESET_BASES: Record<CodePointCdnPreset, string> = {
   twemoji: "https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0/assets/svg",
   openmoji: "https://cdn.jsdelivr.net/npm/openmoji@17.0.0/color/svg",
   noto: "https://cdn.jsdelivr.net/gh/googlefonts/noto-emoji@v2.047/svg",
@@ -28,6 +31,10 @@ export function resolveSourceConfig(source: EmojiSource = DEFAULT_SVG_SOURCE): {
   ext: string;
   codePointFormat: CodePointFormat;
 } {
+  if (isFluentSource(source)) {
+    throw new Error("Fluent sources do not use codepoint filename stems");
+  }
+
   if (typeof source === "string") {
     return {
       baseUrl: PRESET_BASES[source],
@@ -44,6 +51,10 @@ export function resolveSourceConfig(source: EmojiSource = DEFAULT_SVG_SOURCE): {
 }
 
 export function buildAssetUrl(codePoint: string, source: EmojiSource = DEFAULT_SVG_SOURCE): string {
+  if (isFluentSource(source)) {
+    return buildFluentAssetUrl(codePoint, source);
+  }
+
   const { baseUrl, ext, codePointFormat } = resolveSourceConfig(source);
   const fileStem = formatCodePoint(codePoint, codePointFormat);
   return `${baseUrl}/${fileStem}${ext}`;

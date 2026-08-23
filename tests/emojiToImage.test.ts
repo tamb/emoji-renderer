@@ -2,7 +2,13 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/tes
 import { emojiToImage } from "../src/emojiToImage.ts";
 import { IncompatibleOptionsError } from "../src/errors.ts";
 import { sharedSvgCache } from "../src/svgCache.ts";
-import { mockCanvas, mockNotoFetch, mockOpenmojiFetch, mockTwemojiFetch } from "./helpers.ts";
+import {
+  mockCanvas,
+  mockFluentFetch,
+  mockNotoFetch,
+  mockOpenmojiFetch,
+  mockTwemojiFetch,
+} from "./helpers.ts";
 
 describe("emojiToImage", () => {
   let restoreOffscreenCanvas: (() => void) | undefined;
@@ -86,6 +92,15 @@ describe("emojiToImage", () => {
 
     expect(openmojiFetch).toHaveBeenCalledTimes(1);
     expect(notoFetch).toHaveBeenCalledTimes(1);
+  });
+
+  test("fetches the Fluent preset", async () => {
+    restoreOffscreenCanvas = mockCanvas();
+    const fluentFetch = vi.fn(mockFluentFetch());
+
+    await emojiToImage("😀", { source: "fluent", fetch: fluentFetch, format: "blob" });
+
+    expect(fluentFetch).toHaveBeenCalledTimes(1);
   });
 
   test("passes background color through to rasterization", async () => {
