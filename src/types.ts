@@ -23,6 +23,11 @@ export type EmojiSource = EmojiCdnPreset | CustomEmojiSource | FluentEmojiSource
 
 export interface EmojiBaseOptions {
   source?: EmojiSource;
+  /**
+   * CDN presets to try in order after `source` fails to fetch or resolve.
+   * Duplicates of `source` are skipped. Default: none.
+   */
+  fallbacks?: EmojiCdnPreset[];
   size?: number;
   fetch?: typeof fetch;
   cache?: boolean;
@@ -69,6 +74,8 @@ export type ResponsiveImage = boolean | ResponsiveImageOptions;
 
 export interface EmojiToImageOptions extends Omit<EmojiBaseOptions, "source"> {
   source?: EmojiImageSource;
+  /** Draw the system emoji font if `source` and `fallbacks` all fail. Default: false. */
+  fallbackToNative?: boolean;
   format?: EmojiImageFormat;
   mimeType?: "image/png" | "image/webp";
   background?: string | null;

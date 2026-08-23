@@ -4,6 +4,7 @@ export {
   buildAssetUrl,
   DEFAULT_IMAGE_SOURCE,
   DEFAULT_SVG_SOURCE,
+  EMOJI_CDN_PRESETS,
   formatCodePoint,
 } from "./sources.ts";
 export {

@@ -3,11 +3,14 @@ import { emojiToImage } from "../src/emojiToImage.ts";
 import { IncompatibleOptionsError } from "../src/errors.ts";
 import { sharedSvgCache } from "../src/svgCache.ts";
 import {
+  createMockFetch,
   mockCanvas,
   mockFluentFetch,
   mockNotoFetch,
   mockOpenmojiFetch,
   mockTwemojiFetch,
+  OPENMOJI_BASE,
+  TWEMOJI_BASE,
 } from "./helpers.ts";
 
 describe("emojiToImage", () => {
@@ -194,5 +197,69 @@ describe("emojiToImage", () => {
         srcSet: [24, 48],
       }),
     ).rejects.toBeInstanceOf(IncompatibleOptionsError);
+  });
+
+  test("uses fallbacks when the primary CDN returns 404", async () => {
+    restoreOffscreenCanvas = mockCanvas();
+    const fetchImpl = vi.fn(
+      createMockFetch({
+        [`${TWEMOJI_BASE}/1f600.svg`]: 404,
+        [`${OPENMOJI_BASE}/1F600.svg`]:
+          '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="18"/></svg>',
+      }),
+    );
+
+    const blob = await emojiToImage("😀", {
+      source: "twemoji",
+      fallbacks: ["openmoji"],
+      fetch: fetchImpl,
+      format: "blob",
+    });
+
+    expect(blob).toBeInstanceOf(Blob);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  test("draws native emoji when fallbackToNative is set and CDNs fail", async () => {
+    restoreOffscreenCanvas = mockCanvas();
+    const fillText = vi.fn();
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      fillStyle: "",
+      fillRect: vi.fn(),
+      drawImage: vi.fn(),
+      fillText,
+      font: "",
+      textAlign: "",
+      textBaseline: "",
+      imageSmoothingEnabled: true,
+    } as unknown as CanvasRenderingContext2D);
+
+    const fetchImpl = vi.fn(async () => new Response(null, { status: 404 })) as typeof fetch;
+
+    const blob = await emojiToImage("😀", {
+      source: "twemoji",
+      fallbacks: ["openmoji"],
+      fallbackToNative: true,
+      fetch: fetchImpl,
+      format: "blob",
+    });
+
+    expect(blob).toBeInstanceOf(Blob);
+    expect(fillText).toHaveBeenCalledWith("😀", 36, 36);
+    expect(fetchImpl).toHaveBeenCalled();
+  });
+
+  test("still throws when CDNs fail and fallbackToNative is false", async () => {
+    restoreOffscreenCanvas = mockCanvas();
+    const fetchImpl = vi.fn(async () => new Response(null, { status: 404 })) as typeof fetch;
+
+    await expect(
+      emojiToImage("😀", {
+        source: "twemoji",
+        fallbacks: ["noto"],
+        fetch: fetchImpl,
+        format: "blob",
+      }),
+    ).rejects.toMatchObject({ name: "EmojiNotFoundError" });
   });
 });

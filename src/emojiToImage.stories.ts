@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
-import type { EmojiImageFormat, EmojiImageSource } from "./types.ts";
+import type { EmojiCdnPreset, EmojiImageFormat, EmojiImageSource } from "./types.ts";
 import { emojiToImage } from "./emojiToImage.ts";
+import { isEmojiCdnPreset } from "./sources.ts";
 
 interface EmojiToImageStoryArgs {
   emoji: string;
@@ -12,6 +13,8 @@ interface EmojiToImageStoryArgs {
   cache: boolean;
   sourceMode: "native" | "twemoji" | "openmoji" | "noto" | "fluent" | "custom";
   fluentStyle: "color" | "flat" | "high-contrast" | "3d";
+  fallbacks: string;
+  fallbackToNative: boolean;
   fontFamily: string;
   responsive: boolean;
   srcSet: string;
@@ -34,6 +37,8 @@ const meta = {
     cache: true,
     sourceMode: "twemoji",
     fluentStyle: "color",
+    fallbacks: "",
+    fallbackToNative: false,
     fontFamily: "",
     responsive: false,
     srcSet: "",
@@ -87,6 +92,15 @@ const meta = {
       options: ["color", "flat", "high-contrast", "3d"],
       description: 'Fluent artwork style when sourceMode is `fluent`. Default: `"color"`.',
       if: { arg: "sourceMode", eq: "fluent" },
+    },
+    fallbacks: {
+      control: "text",
+      description:
+        'Comma-separated CDN presets to try after `source` fails, e.g. `"openmoji,noto,fluent"`.',
+    },
+    fallbackToNative: {
+      control: "boolean",
+      description: "Draw the system emoji font if CDN sources all fail. Default: false.",
     },
     fontFamily: {
       control: "text",
@@ -210,6 +224,16 @@ const noto = await emojiToImage("😀", { source: "noto", size: 48 });
 const fluent = await emojiToImage("😀", { source: "fluent", size: 48 });
 \`\`\`
 
+**CDN fallbacks and native fallback**
+
+\`\`\`ts
+const image = await emojiToImage("👨‍👩‍👧", {
+  source: "fluent",
+  fallbacks: ["twemoji", "openmoji"],
+  fallbackToNative: true,
+});
+\`\`\`
+
 **Pixelated output**
 
 \`\`\`ts
@@ -226,6 +250,8 @@ const image = await emojiToImage("👾", {
 | --- | --- | --- | --- |
 | \`size\` | \`number\` | \`72\` | Width and height in pixels |
 | \`source\` | \`"native" \\| "twemoji" \\| "openmoji" \\| "noto" \\| "fluent" \\| { preset: "fluent", style? } \\| { baseUrl, ext?, codePointFormat? }\` | \`"twemoji"\` | CDN preset (default Twemoji), Fluent style, custom asset base, or system font |
+| \`fallbacks\` | \`("twemoji" \\| "openmoji" \\| "noto" \\| "fluent")[]\` | none | CDN presets to try after \`source\` fails |
+| \`fallbackToNative\` | \`boolean\` | \`false\` | Draw the system emoji font if CDN sources all fail |
 | \`fetch\` | \`typeof fetch\` | \`globalThis.fetch\` | Custom fetch (not exposed here) |
 | \`cache\` | \`boolean\` | \`true\` | Cache fetched SVG text |
 | \`signal\` | \`AbortSignal\` | — | Abort in-flight fetch (not exposed here) |
@@ -258,6 +284,15 @@ function resolveSource(args: EmojiToImageStoryArgs): EmojiImageSource {
     return args.fluentStyle === "color" ? "fluent" : { preset: "fluent", style: args.fluentStyle };
   }
   return args.sourceMode;
+}
+
+function parseFallbacks(value: string): EmojiCdnPreset[] | undefined {
+  const sources = value
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part): part is EmojiCdnPreset => isEmojiCdnPreset(part));
+
+  return sources.length > 0 ? sources : undefined;
 }
 
 function parseSrcSet(value: string): number[] | undefined {
@@ -305,6 +340,8 @@ function renderImagePreview(args: EmojiToImageStoryArgs): HTMLDivElement {
     pixelate: args.pixelate >= 2 ? args.pixelate : undefined,
     cache: args.cache,
     source: resolveSource(args),
+    fallbacks: parseFallbacks(args.fallbacks),
+    fallbackToNative: args.fallbackToNative || undefined,
     fontFamily: args.fontFamily || undefined,
     responsive: args.responsive || undefined,
     srcSet: parseSrcSet(args.srcSet),
@@ -450,6 +487,35 @@ export const NativeSource: Story = {
 const image = await emojiToImage("😀", {
   source: "native",
   size: 96,
+});
+\`\`\`
+        `,
+      },
+    },
+  },
+  render: renderImagePreview,
+};
+
+export const CdnFallbacks: Story = {
+  name: "CDN fallbacks",
+  args: {
+    emoji: "👨‍👩‍👧",
+    size: 96,
+    sourceMode: "fluent",
+    fallbacks: "twemoji,openmoji",
+    fallbackToNative: true,
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: `
+Fluent has no asset for 👨‍👩‍👧. \`fallbacks\` tries other CDNs; \`fallbackToNative\` uses the system font if those fail too.
+
+\`\`\`ts
+const image = await emojiToImage("👨‍👩‍👧", {
+  source: "fluent",
+  fallbacks: ["twemoji", "openmoji"],
+  fallbackToNative: true,
 });
 \`\`\`
         `,

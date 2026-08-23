@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
-import type { EmojiSource } from "./types.ts";
+import type { EmojiCdnPreset, EmojiSource } from "./types.ts";
 import { emojiToSvg } from "./emojiToSvg.ts";
+import { isEmojiCdnPreset } from "./sources.ts";
 
 interface EmojiToSvgStoryArgs {
   emoji: string;
@@ -10,6 +11,7 @@ interface EmojiToSvgStoryArgs {
   cache: boolean;
   sourceMode: "twemoji" | "openmoji" | "noto" | "fluent" | "custom";
   fluentStyle: "color" | "flat" | "high-contrast" | "3d";
+  fallbacks: string;
   responsiveMode: "fixed" | "intrinsic" | "relative" | "fill";
   customBaseUrl: string;
   customExt: string;
@@ -27,6 +29,7 @@ const meta = {
     cache: true,
     sourceMode: "twemoji",
     fluentStyle: "color",
+    fallbacks: "",
     responsiveMode: "fixed",
     customBaseUrl: "https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0/assets/svg",
     customExt: ".svg",
@@ -72,6 +75,11 @@ const meta = {
       description:
         'Fluent artwork style when sourceMode is `fluent`. Default: `"color"`. `"3d"` embeds a PNG in SVG.',
       if: { arg: "sourceMode", eq: "fluent" },
+    },
+    fallbacks: {
+      control: "text",
+      description:
+        'Comma-separated CDN presets to try after `source` fails, e.g. `"openmoji,noto,fluent"`.',
     },
     customBaseUrl: {
       control: "text",
@@ -161,6 +169,15 @@ const fluent = await emojiToSvg("😀", { source: "fluent" });
 const fluentFlat = await emojiToSvg("😀", { source: { preset: "fluent", style: "flat" } });
 \`\`\`
 
+**CDN fallbacks**
+
+\`\`\`ts
+const svg = await emojiToSvg("👨‍👩‍👧", {
+  source: "fluent",
+  fallbacks: ["twemoji", "openmoji"],
+});
+\`\`\`
+
 **Custom CDN source**
 
 \`\`\`ts
@@ -179,6 +196,7 @@ const svg = await emojiToSvg("😀", {
 | --- | --- | --- | --- |
 | \`size\` | \`number\` | \`72\` | Width and height in pixels |
 | \`source\` | \`"twemoji" \\| "openmoji" \\| "noto" \\| "fluent" \\| { preset: "fluent", style? } \\| { baseUrl, ext?, codePointFormat? }\` | \`"twemoji"\` | CDN preset, Fluent style, or custom asset base |
+| \`fallbacks\` | \`("twemoji" \\| "openmoji" \\| "noto" \\| "fluent")[]\` | none | CDN presets to try after \`source\` fails |
 | \`fetch\` | \`typeof fetch\` | \`globalThis.fetch\` | Custom fetch (not exposed here) |
 | \`cache\` | \`boolean\` | \`true\` | Cache fetched SVG text |
 | \`signal\` | \`AbortSignal\` | — | Abort in-flight fetch (not exposed here) |
@@ -206,6 +224,15 @@ function resolveSource(args: EmojiToSvgStoryArgs): EmojiSource {
     return args.fluentStyle === "color" ? "fluent" : { preset: "fluent", style: args.fluentStyle };
   }
   return args.sourceMode;
+}
+
+function parseFallbacks(value: string): EmojiCdnPreset[] | undefined {
+  const sources = value
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part): part is EmojiCdnPreset => isEmojiCdnPreset(part));
+
+  return sources.length > 0 ? sources : undefined;
 }
 
 function resolveResponsive(args: EmojiToSvgStoryArgs) {
@@ -267,6 +294,7 @@ function renderSvgPreview(args: EmojiToSvgStoryArgs): HTMLDivElement {
     pixelate: args.pixelate >= 2 ? args.pixelate : undefined,
     cache: args.cache,
     source: resolveSource(args),
+    fallbacks: parseFallbacks(args.fallbacks),
     responsive: resolveResponsive(args),
   })
     .then((svg) => {
@@ -301,6 +329,32 @@ export const ZwjSequence: Story = {
   args: {
     emoji: "👨‍👩‍👧",
     size: 64,
+  },
+  render: renderSvgPreview,
+};
+
+export const CdnFallbacks: Story = {
+  name: "CDN fallbacks",
+  args: {
+    emoji: "👨‍👩‍👧",
+    sourceMode: "fluent",
+    fallbacks: "twemoji,openmoji",
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: `
+Fluent has no asset for 👨‍👩‍👧. \`fallbacks\` tries Twemoji, then OpenMoji.
+
+\`\`\`ts
+const svg = await emojiToSvg("👨‍👩‍👧", {
+  source: "fluent",
+  fallbacks: ["twemoji", "openmoji"],
+});
+\`\`\`
+        `,
+      },
+    },
   },
   render: renderSvgPreview,
 };

@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { buildSvgUrl, fetchSvgText } from "../src/fetchSvg.ts";
-import { EmojiNotFoundError } from "../src/errors.ts";
-import { buildAssetUrl, formatCodePoint } from "../src/sources.ts";
+import { EmojiNotFoundError, IncompatibleOptionsError } from "../src/errors.ts";
+import { buildAssetUrl, formatCodePoint, resolveSourceChain } from "../src/sources.ts";
 import { sharedSvgCache } from "../src/svgCache.ts";
 import {
+  createMockFetch,
   FAMILY_CODEPOINT,
   FAMILY_CODEPOINT_NOTO,
   FAMILY_CODEPOINT_OPENMOJI,
@@ -131,5 +132,107 @@ describe("fetchSvgText", () => {
       cache: false,
     });
     expect(svg).toBe(SAMPLE_SVG);
+  });
+
+  test("tries fallbacks after the primary source 404s", async () => {
+    const fetchImpl = vi.fn(
+      createMockFetch({
+        [`${TWEMOJI_BASE}/1f600.svg`]: 404,
+        [`${OPENMOJI_BASE}/1F600.svg`]: SAMPLE_SVG,
+      }),
+    );
+
+    const svg = await fetchSvgText({
+      emoji: "😀",
+      source: "twemoji",
+      fallbacks: ["openmoji"],
+      fetch: fetchImpl,
+      cache: false,
+    });
+
+    expect(svg).toBe(SAMPLE_SVG);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(fetchImpl).toHaveBeenNthCalledWith(1, `${TWEMOJI_BASE}/1f600.svg`, expect.any(Object));
+    expect(fetchImpl).toHaveBeenNthCalledWith(2, `${OPENMOJI_BASE}/1F600.svg`, expect.any(Object));
+  });
+
+  test("skips fallbacks that match the primary source", async () => {
+    const fetchImpl = vi.fn(
+      createMockFetch({
+        [`${TWEMOJI_BASE}/1f600.svg`]: 404,
+        [`${NOTO_BASE}/emoji_u1f600.svg`]: SAMPLE_SVG,
+      }),
+    );
+
+    await fetchSvgText({
+      emoji: "😀",
+      source: "twemoji",
+      fallbacks: ["twemoji", "noto"],
+      fetch: fetchImpl,
+      cache: false,
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(fetchImpl).toHaveBeenNthCalledWith(2, `${NOTO_BASE}/emoji_u1f600.svg`, expect.any(Object));
+  });
+
+  test("throws IncompatibleOptionsError for unknown fallbacks", async () => {
+    await expect(
+      fetchSvgText({
+        emoji: "😀",
+        fallbacks: ["not-a-source"] as unknown as ["twemoji"],
+        fetch: mockTwemojiFetch(),
+      }),
+    ).rejects.toBeInstanceOf(IncompatibleOptionsError);
+  });
+
+  test("tries fallbacks after a network error", async () => {
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      const url = requestUrl(input);
+      if (url.includes(TWEMOJI_BASE)) {
+        throw new TypeError("Failed to fetch");
+      }
+      if (url === `${OPENMOJI_BASE}/1F600.svg`) {
+        return new Response(SAMPLE_SVG, { status: 200 });
+      }
+      return new Response(null, { status: 404 });
+    }) as typeof fetch;
+
+    const svg = await fetchSvgText({
+      emoji: "😀",
+      fallbacks: ["openmoji"],
+      fetch: fetchImpl,
+      cache: false,
+    });
+
+    expect(svg).toBe(SAMPLE_SVG);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  test("does not try fallbacks after abort", async () => {
+    const controller = new AbortController();
+    const fetchImpl = vi.fn(async () => {
+      controller.abort();
+      throw new DOMException("The operation was aborted.", "AbortError");
+    }) as typeof fetch;
+
+    await expect(
+      fetchSvgText({
+        emoji: "😀",
+        fallbacks: ["openmoji"],
+        fetch: fetchImpl,
+        signal: controller.signal,
+        cache: false,
+      }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("resolveSourceChain", () => {
+  test("dedupes fluent string and object with the same style", () => {
+    expect(resolveSourceChain("fluent", ["fluent"])).toEqual(["fluent"]);
+    expect(resolveSourceChain({ preset: "fluent" }, ["fluent"])).toEqual([{ preset: "fluent" }]);
   });
 });

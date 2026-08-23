@@ -3,12 +3,15 @@ import { emojiToSvg } from "../src/emojiToSvg.ts";
 import { EmojiNotFoundError, IncompatibleOptionsError, InvalidEmojiError } from "../src/errors.ts";
 import { sharedSvgCache } from "../src/svgCache.ts";
 import {
+  createMockFetch,
   FAMILY_CODEPOINT,
   FAMILY_EMOJI,
   mockCanvas,
   mockTwemojiFetch,
+  OPENMOJI_BASE,
   requestUrl,
   SAMPLE_SVG,
+  TWEMOJI_BASE,
 } from "./helpers.ts";
 
 describe("emojiToSvg", () => {
@@ -82,6 +85,45 @@ describe("emojiToSvg", () => {
 
     await expect(emojiToSvg("😀", { fetch: brokenFetch })).rejects.toBeInstanceOf(
       EmojiNotFoundError,
+    );
+  });
+
+  test("uses fallbacks when the primary CDN returns 404", async () => {
+    const fetchImpl = vi.fn(
+      createMockFetch({
+        [`${TWEMOJI_BASE}/1f600.svg`]: 404,
+        [`${OPENMOJI_BASE}/1F600.svg`]: SAMPLE_SVG,
+      }),
+    );
+
+    const svg = await emojiToSvg("😀", {
+      fetch: fetchImpl,
+      fallbacks: ["openmoji"],
+      size: 48,
+    });
+
+    expect(svg).toContain("<circle");
+    expect(svg).toContain('width="48"');
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  test("falls back from an unmapped Fluent glyph", async () => {
+    const fetchImpl = vi.fn(
+      createMockFetch({
+        [`${TWEMOJI_BASE}/${FAMILY_CODEPOINT}.svg`]: SAMPLE_SVG,
+      }),
+    );
+
+    const svg = await emojiToSvg(FAMILY_EMOJI, {
+      source: "fluent",
+      fallbacks: ["twemoji"],
+      fetch: fetchImpl,
+    });
+
+    expect(svg).toContain("<circle");
+    expect(fetchImpl).toHaveBeenCalledWith(
+      `https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0/assets/svg/${FAMILY_CODEPOINT}.svg`,
+      expect.any(Object),
     );
   });
 

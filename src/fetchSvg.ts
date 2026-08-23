@@ -1,19 +1,26 @@
 import { emojiToCodePoint } from "./codepoint.ts";
 import { EmojiNotFoundError } from "./errors.ts";
+import { shouldTryNextSource, throwIfAborted } from "./fallback.ts";
 import {
   isFluentRasterStyle,
   isFluentSource,
   resolveFluentSource,
   wrapPngAsSvg,
 } from "./fluent.ts";
-import { buildAssetUrl, DEFAULT_SVG_SOURCE } from "./sources.ts";
+import {
+  assertCdnFallbacks,
+  buildAssetUrl,
+  DEFAULT_SVG_SOURCE,
+  resolveSourceChain,
+} from "./sources.ts";
 import { sharedSvgCache, type SvgCache } from "./svgCache.ts";
 import { blobToDataUrl } from "./svgToImage.ts";
-import type { EmojiSource } from "./types.ts";
+import type { EmojiCdnPreset, EmojiSource } from "./types.ts";
 
 export interface FetchSvgOptions {
   emoji: string;
   source?: EmojiSource;
+  fallbacks?: EmojiCdnPreset[];
   fetch?: typeof fetch;
   cache?: boolean;
   signal?: AbortSignal;
@@ -25,9 +32,32 @@ export function buildSvgUrl(codePoint: string, source: EmojiSource = DEFAULT_SVG
 }
 
 export async function fetchSvgText(options: FetchSvgOptions): Promise<string> {
+  const { source = DEFAULT_SVG_SOURCE, fallbacks = [] } = options;
+  assertCdnFallbacks(fallbacks);
+
+  const sources = resolveSourceChain(source, fallbacks);
+  let lastError: unknown;
+
+  for (const candidate of sources) {
+    throwIfAborted(options.signal);
+
+    try {
+      return await fetchSvgTextFromSource({ ...options, source: candidate });
+    } catch (error) {
+      if (!shouldTryNextSource(error)) {
+        throw error;
+      }
+      lastError = error;
+    }
+  }
+
+  throw lastError ?? new Error("No emoji source succeeded");
+}
+
+async function fetchSvgTextFromSource(options: FetchSvgOptions & { source: EmojiSource }): Promise<string> {
   const {
     emoji,
-    source = DEFAULT_SVG_SOURCE,
+    source,
     fetch: fetchImpl = globalThis.fetch,
     cache = true,
     signal,

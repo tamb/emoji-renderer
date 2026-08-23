@@ -1,8 +1,10 @@
-import { buildFluentAssetUrl, isFluentSource } from "./fluent.ts";
+import { IncompatibleOptionsError } from "./errors.ts";
+import { buildFluentAssetUrl, isFluentSource, resolveFluentSource } from "./fluent.ts";
 import type { CodePointFormat, EmojiCdnPreset, EmojiSource } from "./types.ts";
 
 export const DEFAULT_SVG_SOURCE: EmojiCdnPreset = "twemoji";
 export const DEFAULT_IMAGE_SOURCE: EmojiCdnPreset = "twemoji";
+export const EMOJI_CDN_PRESETS: readonly EmojiCdnPreset[] = ["twemoji", "openmoji", "noto", "fluent"];
 
 type CodePointCdnPreset = Exclude<EmojiCdnPreset, "fluent">;
 
@@ -58,4 +60,53 @@ export function buildAssetUrl(codePoint: string, source: EmojiSource = DEFAULT_S
   const { baseUrl, ext, codePointFormat } = resolveSourceConfig(source);
   const fileStem = formatCodePoint(codePoint, codePointFormat);
   return `${baseUrl}/${fileStem}${ext}`;
+}
+
+export function isEmojiCdnPreset(value: string): value is EmojiCdnPreset {
+  return (EMOJI_CDN_PRESETS as readonly string[]).includes(value);
+}
+
+export function assertCdnFallbacks(
+  fallbacks: readonly string[],
+): asserts fallbacks is readonly EmojiCdnPreset[] {
+  for (const source of fallbacks) {
+    if (!isEmojiCdnPreset(source)) {
+      throw new IncompatibleOptionsError(
+        `Unknown fallback source "${source}". Supported sources: ${EMOJI_CDN_PRESETS.join(", ")}`,
+      );
+    }
+  }
+}
+
+export function sourceIdentity(source: EmojiSource): string {
+  if (isFluentSource(source)) {
+    const resolved = resolveFluentSource(source);
+    return `fluent|${resolved.style}|${resolved.baseUrl}`;
+  }
+
+  if (typeof source === "string") {
+    return source;
+  }
+
+  const resolved = resolveSourceConfig(source);
+  return `custom|${resolved.baseUrl}|${resolved.ext}|${resolved.codePointFormat}`;
+}
+
+export function resolveSourceChain(
+  primary: EmojiSource,
+  fallbacks: readonly EmojiCdnPreset[] = [],
+): EmojiSource[] {
+  const seen = new Set<string>();
+  const sources: EmojiSource[] = [];
+
+  for (const source of [primary, ...fallbacks]) {
+    const id = sourceIdentity(source);
+    if (seen.has(id)) {
+      continue;
+    }
+    seen.add(id);
+    sources.push(source);
+  }
+
+  return sources;
 }

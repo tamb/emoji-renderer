@@ -78,18 +78,31 @@ const custom = await emojiToSvg("😀", {
     codePointFormat: "openmoji",
   },
 });
+
+const withFallbacks = await emojiToSvg("👨‍👩‍👧", {
+  source: "fluent",
+  fallbacks: ["twemoji", "openmoji", "noto"],
+});
+
+const imageWithNativeFallback = await emojiToImage("👨‍👩‍👧", {
+  source: "fluent",
+  fallbacks: ["twemoji", "openmoji"],
+  fallbackToNative: true,
+});
 ```
 
 Fluent assets are looked up by Unicode from a generated map of the official [microsoft/fluentui-emoji](https://github.com/microsoft/fluentui-emoji) tree (pinned jsDelivr commit). Coverage is not complete: country flags and some ZWJ families such as 👨‍👩‍👧 are missing upstream. High-contrast has no skin-tone variants. `"3d"` fetches PNG and wraps it in SVG.
 
 ## Options
 
-| Option           | Applies to     | Default            | Description                                                                                        |
-| ---------------- | -------------- | ------------------ | -------------------------------------------------------------------------------------------------- |
-| `size`           | both           | `72`               | Width and height in pixels                                                                         |
-| `source`         | both*          | `"twemoji"`        | `"native"`*, CDN presets, `{ preset: "fluent", style? }`, or `{ baseUrl, ext?, codePointFormat? }` |
-| `fetch`          | both           | `globalThis.fetch` | Custom fetch implementation                                                                        |
-| `cache`          | both           | `true`             | Cache fetched SVG text in memory                                                                   |
+| Option             | Applies to     | Default            | Description                                                                                        |
+| ------------------ | -------------- | ------------------ | -------------------------------------------------------------------------------------------------- |
+| `size`             | both           | `72`               | Width and height in pixels                                                                         |
+| `source`           | both*          | `"twemoji"`        | `"native"`*, CDN presets, `{ preset: "fluent", style? }`, or `{ baseUrl, ext?, codePointFormat? }` |
+| `fallbacks`        | both           | none               | CDN presets (`"twemoji"`, `"openmoji"`, `"noto"`, `"fluent"`) to try after `source` fails          |
+| `fallbackToNative` | `emojiToImage` | `false`            | Draw the system emoji font if `source` and `fallbacks` all fail                                    |
+| `fetch`            | both           | `globalThis.fetch` | Custom fetch implementation                                                                        |
+| `cache`            | both           | `true`             | Cache fetched SVG text in memory                                                                   |
 | `signal`         | both           | —                  | `AbortSignal` for fetch                                                                            |
 | `xmlDeclaration` | `emojiToSvg`   | `false`            | Prefix SVG with `<?xml ...?>`                                                                      |
 | `pixelate`       | both           | off                | Block size in px; `>= 2` pixelates                                                                 |
