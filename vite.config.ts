@@ -1,5 +1,26 @@
+import { devices } from "playwright";
 import { defineConfig } from "vite-plus";
 import { playwright } from "vite-plus/test/browser-playwright";
+
+function mobileBrowserInstance(name: string, deviceName: "iPhone 15" | "Pixel 8") {
+  const device = devices[deviceName];
+  const viewport = device.viewport ?? { width: 390, height: 844 };
+
+  return {
+    name,
+    browser: device.defaultBrowserType,
+    viewport,
+    provider: playwright({
+      contextOptions: {
+        userAgent: device.userAgent,
+        viewport,
+        deviceScaleFactor: device.deviceScaleFactor,
+        isMobile: device.isMobile,
+        hasTouch: device.hasTouch,
+      },
+    }),
+  };
+}
 
 export default defineConfig({
   staged: {
@@ -47,6 +68,22 @@ export default defineConfig({
             provider: playwright(),
             headless: true,
             instances: [{ browser: "chromium" }, { browser: "firefox" }, { browser: "webkit" }],
+          },
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "browser-mobile",
+          include: ["e2e/**/*.browser.test.ts", "e2e/**/*.mobile.test.ts"],
+          browser: {
+            enabled: true,
+            provider: playwright(),
+            headless: true,
+            instances: [
+              mobileBrowserInstance("mobile-safari", "iPhone 15"),
+              mobileBrowserInstance("mobile-chrome", "Pixel 8"),
+            ],
           },
         },
       },

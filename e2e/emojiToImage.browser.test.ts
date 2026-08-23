@@ -74,6 +74,45 @@ describe("emoji renderer browser integration", () => {
     expect(svg).not.toMatch(/\swidth="/);
   });
 
+  test("falls back from Fluent to Twemoji for unmapped ZWJ emoji", async () => {
+    const svg = await emojiToSvg("👨‍👩‍👧", {
+      source: "fluent",
+      fallbacks: ["twemoji"],
+      size: 48,
+      cache: false,
+    });
+
+    expect(svg).toContain("<svg");
+  });
+
+  test("falls back to native when CDN sources fail", async () => {
+    const fetchImpl = (async () => new Response(null, { status: 404 })) as typeof fetch;
+    const image = await emojiToImage("😀", {
+      source: "twemoji",
+      fallbacks: ["openmoji"],
+      fallbackToNative: true,
+      fetch: fetchImpl,
+      size: 48,
+    });
+
+    expect(image).toBeInstanceOf(HTMLImageElement);
+    expect(image.naturalWidth).toBeGreaterThan(0);
+  });
+
+  test("uses device pixel ratio for responsive images", async () => {
+    const logicalSize = 48;
+    const image = await emojiToImage("😀", {
+      size: logicalSize,
+      responsive: true,
+      cache: false,
+    });
+    const expected = Math.max(1, Math.round(logicalSize * (window.devicePixelRatio || 1)));
+
+    expect(image.naturalWidth).toBe(expected);
+    expect(image.naturalHeight).toBe(expected);
+    expect(image.style.width).toBe(`${logicalSize}px`);
+  });
+
   test("builds srcset image variants in the browser", async () => {
     const image = await emojiToImage("😀", {
       size: 48,

@@ -1,5 +1,6 @@
 import { IncompatibleOptionsError } from "./errors.ts";
-import { nativeEmojiToDataUrl, nativeEmojiToImageBlob } from "./nativeToImage.ts";
+import { shouldTryNextSource } from "./fallback.ts";
+import { nativeEmojiToImageBlob } from "./nativeToImage.ts";
 import { emojiToSvg } from "./emojiToSvg.ts";
 import {
   applyImageDisplay,
@@ -9,7 +10,7 @@ import {
   resolveResponsiveImage,
 } from "./responsive.ts";
 import { DEFAULT_IMAGE_SOURCE } from "./sources.ts";
-import { blobToDataUrl, loadImageFromUrl, svgToDataUrl, svgToImageBlob } from "./svgToImage.ts";
+import { blobToDataUrl, loadImageFromUrl, svgToImageBlob } from "./svgToImage.ts";
 import type {
   EmojiImageFormat,
   EmojiImageSource,
@@ -25,6 +26,8 @@ interface RenderEmojiBlobOptions {
   background: string | null;
   pixelate?: number;
   source: EmojiImageSource;
+  fallbacks?: EmojiToImageOptions["fallbacks"];
+  fallbackToNative?: boolean;
   fontFamily?: string;
   fetch?: typeof fetch;
   cache?: boolean;
@@ -47,6 +50,8 @@ async function renderEmojiBlob(options: RenderEmojiBlobOptions): Promise<Blob> {
     background,
     pixelate,
     source,
+    fallbacks,
+    fallbackToNative = false,
     fontFamily,
     fetch,
     cache,
@@ -64,21 +69,37 @@ async function renderEmojiBlob(options: RenderEmojiBlobOptions): Promise<Blob> {
     });
   }
 
-  const svg = await emojiToSvg(emoji, {
-    size: renderSize,
-    source: asCdnSource(source),
-    fetch,
-    cache,
-    signal,
-  });
+  try {
+    const svg = await emojiToSvg(emoji, {
+      size: renderSize,
+      source: asCdnSource(source),
+      fallbacks,
+      fetch,
+      cache,
+      signal,
+    });
 
-  return svgToImageBlob({
-    svg,
-    size: renderSize,
-    mimeType,
-    background,
-    pixelate,
-  });
+    return svgToImageBlob({
+      svg,
+      size: renderSize,
+      mimeType,
+      background,
+      pixelate,
+    });
+  } catch (error) {
+    if (fallbackToNative && shouldTryNextSource(error)) {
+      return nativeEmojiToImageBlob({
+        emoji,
+        size: renderSize,
+        mimeType,
+        background,
+        pixelate,
+        fontFamily,
+      });
+    }
+
+    throw error;
+  }
 }
 
 async function blobToHtmlImage(blob: Blob, renderSize: number): Promise<HTMLImageElement> {
@@ -104,6 +125,8 @@ async function renderEmojiImageElement(
     background = null,
     pixelate,
     source = DEFAULT_IMAGE_SOURCE,
+    fallbacks,
+    fallbackToNative,
     fontFamily,
     responsive,
     srcSet,
@@ -130,6 +153,8 @@ async function renderEmojiImageElement(
         background,
         pixelate,
         source,
+        fallbacks,
+        fallbackToNative,
         fontFamily,
         fetch,
         cache,
@@ -165,6 +190,8 @@ async function renderEmojiImageElement(
     background,
     pixelate,
     source,
+    fallbacks,
+    fallbackToNative,
     fontFamily,
     fetch,
     cache,
@@ -187,6 +214,8 @@ export async function emojiToImage<TFormat extends EmojiImageFormat = "image">(
     pixelate,
     size = 72,
     source = DEFAULT_IMAGE_SOURCE,
+    fallbacks,
+    fallbackToNative,
     fontFamily,
     responsive,
     srcSet,
@@ -206,6 +235,8 @@ export async function emojiToImage<TFormat extends EmojiImageFormat = "image">(
       background,
       pixelate,
       source,
+      fallbacks,
+      fallbackToNative,
       fontFamily,
       responsive,
       srcSet,
@@ -218,39 +249,26 @@ export async function emojiToImage<TFormat extends EmojiImageFormat = "image">(
 
   const resolved = resolveResponsiveImage(responsive, size);
   const renderSize = resolveRenderSize(size, resolved.dpr);
-
-  if (isNativeSource(source)) {
-    const nativeOptions = {
-      emoji,
-      size: renderSize,
-      mimeType,
-      background,
-      pixelate,
-      fontFamily,
-    };
-
-    if (format === "blob") {
-      return (await nativeEmojiToImageBlob(nativeOptions)) as EmojiToImageResult<TFormat>;
-    }
-
-    return (await nativeEmojiToDataUrl(nativeOptions)) as EmojiToImageResult<TFormat>;
-  }
-
-  const svg = await emojiToSvg(emoji, {
-    size: renderSize,
-    source: asCdnSource(source),
+  const blob = await renderEmojiBlob({
+    emoji,
+    renderSize,
+    mimeType,
+    background,
+    pixelate,
+    source,
+    fallbacks,
+    fallbackToNative,
+    fontFamily,
     fetch,
     cache,
     signal,
   });
 
-  const rasterOptions = { svg, size: renderSize, mimeType, background, pixelate };
-
   if (format === "blob") {
-    return (await svgToImageBlob(rasterOptions)) as EmojiToImageResult<TFormat>;
+    return blob as EmojiToImageResult<TFormat>;
   }
 
-  return (await svgToDataUrl(rasterOptions)) as EmojiToImageResult<TFormat>;
+  return (await blobToDataUrl(blob)) as EmojiToImageResult<TFormat>;
 }
 
 export type {
