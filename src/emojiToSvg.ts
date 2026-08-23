@@ -50,4 +50,9 @@ export type {
   ResponsiveSvg,
   ResponsiveSvgOptions,
 } from "./types.ts";
-export { InvalidEmojiError, EmojiNotFoundError, IncompatibleOptionsError } from "./errors.ts";
+export {
+  InvalidEmojiError,
+  EmojiNotFoundError,
+  EmojiFetchError,
+  IncompatibleOptionsError,
+} from "./errors.ts";

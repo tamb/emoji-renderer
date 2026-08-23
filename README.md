@@ -8,6 +8,14 @@ Convert emoji to SVG markup or raster images. Both `emojiToSvg` and `emojiToImag
 npm install emoji-renderer
 ```
 
+For raster output in Node.js, also install the optional canvas peers:
+
+```bash
+npm install @napi-rs/canvas @resvg/resvg-js
+```
+
+Requires **Node.js 22+**. This package is **ESM-only** (`import`); CommonJS `require()` is not supported.
+
 ## Usage
 
 ```ts
@@ -15,12 +23,17 @@ import { emojiToSvg, emojiToImage } from "emoji-renderer";
 
 const svg = await emojiToSvg("😀", { size: 48 });
 const pixelSvg = await emojiToSvg("👾", { size: 96, pixelate: 8 });
-document.querySelector("#target")!.innerHTML = svg;
+
+// Prefer inserting SVG as an image or sanitizing before inline markup.
+const holder = document.createElement("div");
+holder.insertAdjacentHTML("beforeend", svg); // only when the SVG source is trusted
 
 // Defaults to Twemoji (same source as emojiToSvg)
 const image = await emojiToImage("🎉", { size: 48 });
 document.body.append(image);
 ```
+
+> **Security:** Preset CDN sources serve known artwork, but a custom `{ baseUrl }` or compromised CDN can return untrusted SVG markup. Do not assign fetched SVG to `innerHTML` unless you trust the source or sanitize it. Prefer `emojiToImage({ format: "dataUrl" })` with an `<img>` when possible.
 
 ### Tree-shakable imports
 
@@ -95,24 +108,26 @@ Fluent assets are looked up by Unicode from a generated map of the official [mic
 
 ## Options
 
-| Option             | Applies to     | Default            | Description                                                                                        |
-| ------------------ | -------------- | ------------------ | -------------------------------------------------------------------------------------------------- |
-| `size`             | both           | `72`               | Width and height in pixels                                                                         |
-| `source`           | both*          | `"twemoji"`        | `"native"`*, CDN presets, `{ preset: "fluent", style? }`, or `{ baseUrl, ext?, codePointFormat? }` |
-| `fallbacks`        | both           | none               | CDN presets (`"twemoji"`, `"openmoji"`, `"noto"`, `"fluent"`) to try after `source` fails          |
-| `fallbackToNative` | `emojiToImage` | `false`            | Draw the system emoji font if `source` and `fallbacks` all fail                                    |
-| `fetch`            | both           | `globalThis.fetch` | Custom fetch implementation                                                                        |
-| `cache`            | both           | `true`             | Cache fetched SVG text in memory                                                                   |
-| `signal`           | both           | —                  | `AbortSignal` for fetch                                                                            |
-| `xmlDeclaration`   | `emojiToSvg`   | `false`            | Prefix SVG with `<?xml ...?>`                                                                      |
-| `pixelate`         | both           | off                | Block size in px; `>= 2` pixelates                                                                 |
-| `format`           | `emojiToImage` | `"image"`          | `"image"`, `"blob"`, or `"dataUrl"`                                                                |
-| `mimeType`         | `emojiToImage` | `"image/png"`      | `"image/png"` or `"image/webp"`                                                                    |
-| `background`       | `emojiToImage` | `null`             | Canvas fill color before drawing                                                                   |
-| `fontFamily`       | `emojiToImage` | emoji font stack   | Font stack when `source` is `"native"`                                                             |
-| `responsive`       | both*          | off                | CSS-scalable SVG or retina raster display                                                          |
-| `srcSet`           | `emojiToImage` | off                | Logical widths for `<img srcset>` (`format` image)                                                 |
-| `sizes`            | `emojiToImage` | —                  | Optional `<img sizes>` when `srcSet` is set                                                        |
+| Option             | Applies to     | Default            | Description                                                                                                                            |
+| ------------------ | -------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `size`             | both           | `72`               | Width and height in pixels                                                                                                             |
+| `source`           | both*          | `"twemoji"`        | `"twemoji"`, `"openmoji"`, `"noto"`, `"fluent"`, `"native"`*, `{ preset: "fluent", style? }`, or `{ baseUrl, ext?, codePointFormat? }` |
+| `fallbacks`        | both           | none               | CDN presets (`"twemoji"`, `"openmoji"`, `"noto"`, `"fluent"`) to try after `source` fails                                              |
+| `fallbackToNative` | `emojiToImage` | `false`            | Draw the system emoji font if `source` and `fallbacks` all fail                                                                        |
+| `fetch`            | both           | `globalThis.fetch` | Custom fetch implementation                                                                                                            |
+| `timeout`          | both           | `8000`             | Per-request fetch timeout in ms (composed with `signal`)                                                                               |
+| `retries`          | both           | `2`                | Same-source retries for transient failures (network, 429, 5xx)                                                                         |
+| `cache`            | both           | `true`             | Cache fetched SVG text in memory                                                                                                       |
+| `signal`           | both           | —                  | `AbortSignal` for fetch                                                                                                                |
+| `xmlDeclaration`   | `emojiToSvg`   | `false`            | Prefix SVG with `<?xml ...?>`                                                                                                          |
+| `pixelate`         | both           | off                | Block size in px; `>= 2` pixelates                                                                                                     |
+| `format`           | `emojiToImage` | `"image"`          | `"image"`, `"blob"`, or `"dataUrl"`                                                                                                    |
+| `mimeType`         | `emojiToImage` | `"image/png"`      | `"image/png"` or `"image/webp"`                                                                                                        |
+| `background`       | `emojiToImage` | `null`             | Canvas fill color before drawing                                                                                                       |
+| `fontFamily`       | `emojiToImage` | emoji font stack   | Font stack when `source` is `"native"`                                                                                                 |
+| `responsive`       | both*          | off                | CSS-scalable SVG or retina raster display                                                                                              |
+| `srcSet`           | `emojiToImage` | off                | Logical widths for `<img srcset>` (`format` image)                                                                                     |
+| `sizes`            | `emojiToImage` | —                  | Optional `<img sizes>` when `srcSet` is set                                                                                            |
 
 \* `"native"` applies to `emojiToImage` only. It draws the platform emoji font via canvas (no CDN fetch). Appearance varies by OS/browser; some glyphs may be clipped (see below).
 
@@ -152,17 +167,68 @@ const srcsetImg = await emojiToImage("😀", {
 
 `responsive` is incompatible with `pixelate` on `emojiToSvg`. `srcSet` requires `format: "image"`.
 
+### Errors
+
+| Error                      | When                                                                   |
+| -------------------------- | ---------------------------------------------------------------------- |
+| `InvalidEmojiError`        | Empty or invalid emoji input                                           |
+| `EmojiNotFoundError`       | Asset missing (HTTP 404/410, unmapped Fluent glyph)                    |
+| `EmojiFetchError`          | Transient fetch failure (network, HTTP 429/5xx, timeout after retries) |
+| `IncompatibleOptionsError` | Conflicting options (e.g. `responsive` + `pixelate`)                   |
+| `RasterizeError`           | Canvas/image rasterization failed                                      |
+
+Both `EmojiNotFoundError` and `EmojiFetchError` trigger `fallbacks` when set. User aborts (`AbortSignal`) do not.
+
+## Production deployment
+
+For production apps, **self-host emoji assets** or serve them from your own CDN instead of relying on jsDelivr at render time:
+
+```ts
+const svg = await emojiToSvg("😀", {
+  source: {
+    baseUrl: "https://assets.example.com/emoji",
+    ext: ".svg",
+    codePointFormat: "twemoji",
+  },
+  fallbacks: ["openmoji"],
+});
+```
+
+- **CSP:** allow `connect-src` (and `img-src` for raster) to your asset origin, not only `cdn.jsdelivr.net`.
+- **Resilience:** set `fallbacks` and, for images, `fallbackToNative: true` as a last resort.
+- **Pin versions:** preset URLs are pinned to specific upstream releases; override with `{ baseUrl }` when you mirror assets.
+- **Fluent bundle size:** the Fluent lookup map (~176 KB) loads only when `source` resolves to Fluent.
+
+Built-in CDN presets remain convenient for demos and prototypes.
+
 ## Browser vs Node
 
-This library is browser-first. SVG fetching works anywhere `fetch` is available. Rasterization requires a DOM with canvas support (`document`, `Image`, `canvas` or `OffscreenCanvas`).
+This library is **browser-first** and **ESM-only**.
 
-For Node.js tests or scripts, use a DOM implementation such as `happy-dom` or `jsdom`.
+| Capability                  | Browser                  | Node.js 22+                                               |
+| --------------------------- | ------------------------ | --------------------------------------------------------- |
+| `emojiToSvg`                | Yes (`fetch`)            | Yes (`fetch`)                                             |
+| `emojiToImage` blob/dataUrl | Yes (DOM canvas)         | Yes with optional `@napi-rs/canvas` and `@resvg/resvg-js` |
+| `emojiToImage` image        | Yes (`HTMLImageElement`) | Not supported (use `blob` or `dataUrl`)                   |
+| `source: "native"`          | Yes                      | Requires `@napi-rs/canvas` (system fonts vary)            |
+
+```ts
+// Node.js raster example
+import { emojiToImage } from "emoji-renderer";
+
+const blob = await emojiToImage("😀", { format: "blob", size: 48 });
+```
+
+For unit tests in Node without `@napi-rs/canvas`, use a DOM shim such as `happy-dom` for browser-style rasterization, or mock `fetch` when testing SVG output only.
 
 ## Development
 
 ```bash
 npm install
-npm test
+npm run test:install-browsers   # reads vitest.browsers.ts — same browsers CI installs
+npm test                        # all projects (unit, node, browser, browser-mobile)
+npm run test:unit               # fast unit tests only
+npm run test:node
 npm run test:browser
 npm run test:browser:mobile
 npm run build

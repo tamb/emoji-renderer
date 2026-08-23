@@ -23,16 +23,13 @@ jobs:
         run: npx vp check
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium firefox webkit
+        run: npm run test:install-browsers
 
-      - name: Test with coverage
-        run: npx vp test --project unit --coverage
+      - name: Test
+        run: npm run test
 
-      - name: Browser tests
-        run: npx vp test --project browser
-
-      - name: Mobile browser tests
-        run: npx vp test --project browser-mobile
+      - name: Unit coverage
+        run: npm run test:coverage
 
       - name: Pack
         run: npx vp pack

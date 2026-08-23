@@ -1,4 +1,5 @@
 import {
+  EmojiFetchError,
   EmojiNotFoundError,
   IncompatibleOptionsError,
   InvalidEmojiError,
@@ -37,6 +38,7 @@ export function shouldTryNextSource(error: unknown): boolean {
 
   return (
     error instanceof EmojiNotFoundError ||
+    error instanceof EmojiFetchError ||
     error instanceof TypeError ||
     (error instanceof Error && error.message.includes("fetch is not available"))
   );

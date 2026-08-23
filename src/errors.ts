@@ -25,6 +25,20 @@ export class EmojiNotFoundError extends Error {
   }
 }
 
+export class EmojiFetchError extends Error {
+  readonly name = "EmojiFetchError";
+
+  constructor(
+    public readonly emoji: string,
+    public readonly url: string,
+    public readonly status?: number,
+    options?: { cause?: unknown },
+  ) {
+    const statusPart = status === undefined ? "" : ` (HTTP ${status})`;
+    super(`Failed to fetch emoji "${emoji}" from ${url}${statusPart}`, options);
+  }
+}
+
 export class RasterizeError extends Error {
   readonly name = "RasterizeError";
 

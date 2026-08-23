@@ -1,5 +1,5 @@
 import { IncompatibleOptionsError } from "./errors.ts";
-import { buildFluentAssetUrl, isFluentSource, resolveFluentSource } from "./fluent.ts";
+import { isFluentSource, resolveFluentSource } from "./fluentMeta.ts";
 import type { CodePointFormat, EmojiCdnPreset, EmojiSource } from "./types.ts";
 
 export const DEFAULT_SVG_SOURCE: EmojiCdnPreset = "twemoji";
@@ -16,7 +16,7 @@ type CodePointCdnPreset = Exclude<EmojiCdnPreset, "fluent">;
 const PRESET_BASES: Record<CodePointCdnPreset, string> = {
   twemoji: "https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0/assets/svg",
   openmoji: "https://cdn.jsdelivr.net/npm/openmoji@17.0.0/color/svg",
-  noto: "https://cdn.jsdelivr.net/gh/googlefonts/noto-emoji@v2.047/svg",
+  noto: "https://cdn.jsdelivr.net/gh/googlefonts/noto-emoji@v2.051/svg",
 };
 
 /**
@@ -59,7 +59,9 @@ export function resolveSourceConfig(source: EmojiSource = DEFAULT_SVG_SOURCE): {
 
 export function buildAssetUrl(codePoint: string, source: EmojiSource = DEFAULT_SVG_SOURCE): string {
   if (isFluentSource(source)) {
-    return buildFluentAssetUrl(codePoint, source);
+    throw new Error(
+      'buildAssetUrl does not resolve Fluent sources synchronously. Use source: "fluent" with emojiToSvg or emojiToImage.',
+    );
   }
 
   const { baseUrl, ext, codePointFormat } = resolveSourceConfig(source);
@@ -114,4 +116,17 @@ export function resolveSourceChain(
   }
 
   return sources;
+}
+
+export async function buildAssetUrlAsync(
+  codePoint: string,
+  source: EmojiSource = DEFAULT_SVG_SOURCE,
+): Promise<string> {
+  if (isFluentSource(source)) {
+    // fluent.ts embeds a ~194 KB ID map; load it only when a Fluent source is requested.
+    const { buildFluentAssetUrl } = await import("./fluent.ts");
+    return buildFluentAssetUrl(codePoint, source);
+  }
+
+  return buildAssetUrl(codePoint, source);
 }

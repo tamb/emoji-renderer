@@ -1,5 +1,5 @@
 import { vi } from "vite-plus/test";
-import { FLUENT_ASSET_BASE } from "../src/fluent.ts";
+import { FLUENT_ASSET_BASE } from "../src/fluentMeta.ts";
 
 export const SAMPLE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="18" fill="#FFCC4D"/></svg>`;
 
@@ -10,7 +10,7 @@ export const FAMILY_CODEPOINT_NOTO = "emoji_u1f468_200d_1f469_200d_1f467";
 
 export const TWEMOJI_BASE = "https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0/assets/svg";
 export const OPENMOJI_BASE = "https://cdn.jsdelivr.net/npm/openmoji@17.0.0/color/svg";
-export const NOTO_BASE = "https://cdn.jsdelivr.net/gh/googlefonts/noto-emoji@v2.047/svg";
+export const NOTO_BASE = "https://cdn.jsdelivr.net/gh/googlefonts/noto-emoji@v2.051/svg";
 export const FLUENT_BASE = FLUENT_ASSET_BASE;
 export const FLUENT_GRINNING_COLOR = `${FLUENT_BASE}/Grinning%20face/Color/grinning_face_color.svg`;
 export const FLUENT_GRINNING_FLAT = `${FLUENT_BASE}/Grinning%20face/Flat/grinning_face_flat.svg`;
@@ -54,6 +54,7 @@ export function createMockFetch(responses: Record<string, string | number> = {})
 export function mockTwemojiFetch(svg = SAMPLE_SVG): typeof fetch {
   return createMockFetch({
     [`${TWEMOJI_BASE}/1f600.svg`]: svg,
+    [`${TWEMOJI_BASE}/26b0.svg`]: svg,
     [`${TWEMOJI_BASE}/${FAMILY_CODEPOINT}.svg`]: svg,
   });
 }

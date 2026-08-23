@@ -39,6 +39,13 @@ describe("emojiToSvg", () => {
     );
   });
 
+  test("strips VS16 from text-default emoji CDN filenames", async () => {
+    const fetchImpl = vi.fn(mockTwemojiFetch());
+    await emojiToSvg("⚰️", { fetch: fetchImpl });
+
+    expect(fetchImpl).toHaveBeenCalledWith(`${TWEMOJI_BASE}/26b0.svg`, expect.any(Object));
+  });
+
   test("uses cache on subsequent calls", async () => {
     const fetchImpl = vi.fn(mockTwemojiFetch());
     await emojiToSvg("😀", { fetch: fetchImpl });
