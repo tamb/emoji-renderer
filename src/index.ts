@@ -6,9 +6,16 @@ export {
   DEFAULT_SVG_SOURCE,
   formatCodePoint,
 } from "./sources.ts";
+export {
+  DEFAULT_FLUENT_STYLE,
+  FLUENT_ASSET_BASE,
+  FLUENT_COMMIT,
+  isFluentSource,
+} from "./fluent.ts";
 
 export type {
   CodePointFormat,
+  CustomEmojiSource,
   EmojiBaseOptions,
   EmojiCdnPreset,
   EmojiImageFormat,
@@ -17,6 +24,8 @@ export type {
   EmojiToImageOptions,
   EmojiToImageResult,
   EmojiToSvgOptions,
+  FluentEmojiSource,
+  FluentStyle,
   ResponsiveImage,
   ResponsiveImageOptions,
   ResponsiveSvg,

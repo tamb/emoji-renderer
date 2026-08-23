@@ -1,6 +1,14 @@
 # Plan: Fluent Emoji source support
 
-Status: planned (not implemented). Track follow-up work for adding Microsoft [Fluent Emoji](https://github.com/microsoft/fluentui-emoji) as a first-class `source` preset alongside `native`, `twemoji`, `openmoji`, and `noto`.
+Status: implemented. Microsoft [Fluent Emoji](https://github.com/microsoft/fluentui-emoji) is a first-class `source` preset alongside `native`, `twemoji`, `openmoji`, and `noto`.
+
+Regenerate the committed map after bumping the pinned commit:
+
+```bash
+FLUENT_REF=<commit> npm run generate:fluent-map
+```
+
+Also update `FLUENT_COMMIT` in `src/fluent.ts`.
 
 ## Why defer
 
@@ -79,7 +87,7 @@ Recommended defaults to validate in a spike:
 | `emojiToSvg`   | `flat` or `color` SVG                                 | Must be vector/markup-friendly |
 | `emojiToImage` | same as SVG, or `3d` PNG only if explicitly requested | Keep SVG→canvas path simple    |
 
-Do **not** default `emojiToImage` to Fluent; keep `"native"` as the library image default.
+Do **not** default `emojiToImage` to Fluent; keep `"twemoji"` as the library image default.
 
 ### 4. Packaging / CDN pinning
 
@@ -121,5 +129,5 @@ Do **not** default `emojiToImage` to Fluent; keep `"native"` as the library imag
 
 - `source: "fluent"` works for common emoji in Storybook and e2e.
 - Map is generated/pinned and documented.
-- Default image source remains `"native"`; SVG default remains `"twemoji"` (unless a later deliberate change).
+- Default image source and SVG default are both `"twemoji"`. `"native"` remains an explicit `emojiToImage` option.
 - Bundle impact for non-Fluent users is negligible (lazy or subpath).

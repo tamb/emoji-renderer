@@ -53,13 +53,26 @@ export default defineConfig({
     ],
   },
   lint: {
-    ignorePatterns: ["demo/**", "coverage/**", "dist/**", "storybook-static/**", ".storybook/**"],
+    ignorePatterns: [
+      "demo/**",
+      "coverage/**",
+      "dist/**",
+      "storybook-static/**",
+      ".storybook/**",
+      "src/generated/**",
+    ],
     options: {
       typeAware: true,
       typeCheck: true,
     },
   },
   fmt: {
-    ignorePatterns: ["demo/**", "coverage/**", "dist/**", "storybook-static/**"],
+    ignorePatterns: [
+      "demo/**",
+      "coverage/**",
+      "dist/**",
+      "storybook-static/**",
+      "src/generated/**",
+    ],
   },
 });

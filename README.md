@@ -1,6 +1,6 @@
 # emoji-renderer
 
-Convert emoji to SVG markup or raster images. Images default to the platform emoji font; SVG defaults to lazy-loaded [Twemoji](https://github.com/jdecked/twemoji) assets. [OpenMoji](https://openmoji.org/) and [Noto Emoji](https://github.com/googlefonts/noto-emoji) CDN presets are also built in.
+Convert emoji to SVG markup or raster images. Both `emojiToSvg` and `emojiToImage` default to lazy-loaded [Twemoji](https://github.com/jdecked/twemoji) assets. [OpenMoji](https://openmoji.org/), [Noto Emoji](https://github.com/googlefonts/noto-emoji), [Fluent Emoji](https://github.com/microsoft/fluentui-emoji), and native system-font rendering are also available.
 
 ## Install
 
@@ -17,7 +17,7 @@ const svg = await emojiToSvg("😀", { size: 48 });
 const pixelSvg = await emojiToSvg("👾", { size: 96, pixelate: 8 });
 document.querySelector("#target")!.innerHTML = svg;
 
-// Defaults to native system emoji (no CDN fetch)
+// Defaults to Twemoji (same source as emojiToSvg)
 const image = await emojiToImage("🎉", { size: 48 });
 document.body.append(image);
 ```
@@ -42,6 +42,7 @@ const pixel = await emojiToImage("👾", { size: 96, pixelate: 8 });
 const twemoji = await emojiToImage("😀", { source: "twemoji", size: 48 });
 const openmoji = await emojiToImage("😀", { source: "openmoji", size: 48 });
 const noto = await emojiToImage("😀", { source: "noto", size: 48 });
+const fluent = await emojiToImage("😀", { source: "fluent", size: 48 });
 const responsiveSvg = await emojiToSvg("😀", { responsive: true });
 const responsiveImg = await emojiToImage("😀", { size: 48, responsive: true });
 const srcsetImg = await emojiToImage("😀", {
@@ -54,16 +55,22 @@ const srcsetImg = await emojiToImage("😀", {
 
 ### Sources
 
-| Source                                | Applies to     | License notes     | Filename style         |
-| ------------------------------------- | -------------- | ----------------- | ---------------------- |
-| `"native"` (image default)            | `emojiToImage` | n/a               | system font via canvas |
-| `"twemoji"` (SVG default)             | both           | CC BY 4.0         | `1f600.svg`            |
-| `"openmoji"`                          | both           | CC BY-SA 4.0      | `1F600.svg`            |
-| `"noto"`                              | both           | Apache 2.0 / OFL  | `emoji_u1f600.svg`     |
-| `{ baseUrl, ext?, codePointFormat? }` | both           | depends on assets | custom                 |
+| Source                                   | Applies to     | License notes     | Filename style                                      |
+| ---------------------------------------- | -------------- | ----------------- | --------------------------------------------------- |
+| `"native"`                               | `emojiToImage` | n/a               | system font via canvas                              |
+| `"twemoji"` (default)                    | both           | CC BY 4.0         | `1f600.svg`                                         |
+| `"openmoji"`                             | both           | CC BY-SA 4.0      | `1F600.svg`                                         |
+| `"noto"`                                 | both           | Apache 2.0 / OFL  | `emoji_u1f600.svg`                                  |
+| `"fluent"`                               | both           | MIT               | name/style folders                                  |
+| `{ preset: "fluent", style?, baseUrl? }` | both           | MIT               | `color` (default), `flat`, `high-contrast`, or `3d` |
+| `{ baseUrl, ext?, codePointFormat? }`    | both           | depends on assets | custom                                              |
 
 ```ts
 const svg = await emojiToSvg("😀", { source: "openmoji" });
+const fluent = await emojiToSvg("👍", { source: "fluent" });
+const fluentFlat = await emojiToSvg("👍", {
+  source: { preset: "fluent", style: "flat" },
+});
 const custom = await emojiToSvg("😀", {
   source: {
     baseUrl: "https://example.com/emoji",
@@ -73,30 +80,32 @@ const custom = await emojiToSvg("😀", {
 });
 ```
 
+Fluent assets are looked up by Unicode from a generated map of the official [microsoft/fluentui-emoji](https://github.com/microsoft/fluentui-emoji) tree (pinned jsDelivr commit). Coverage is not complete: country flags and some ZWJ families such as 👨‍👩‍👧 are missing upstream. High-contrast has no skin-tone variants. `"3d"` fetches PNG and wraps it in SVG.
+
 ## Options
 
-| Option           | Applies to     | Default                             | Description                                                        |
-| ---------------- | -------------- | ----------------------------------- | ------------------------------------------------------------------ |
-| `size`           | both           | `72`                                | Width and height in pixels                                         |
-| `source`         | both*          | image: `"native"`; SVG: `"twemoji"` | `"native"`*, CDN presets, or `{ baseUrl, ext?, codePointFormat? }` |
-| `fetch`          | both           | `globalThis.fetch`                  | Custom fetch implementation                                        |
-| `cache`          | both           | `true`                              | Cache fetched SVG text in memory                                   |
-| `signal`         | both           | —                                   | `AbortSignal` for fetch                                            |
-| `xmlDeclaration` | `emojiToSvg`   | `false`                             | Prefix SVG with `<?xml ...?>`                                      |
-| `pixelate`       | both           | off                                 | Block size in px; `>= 2` pixelates                                 |
-| `format`         | `emojiToImage` | `"image"`                           | `"image"`, `"blob"`, or `"dataUrl"`                                |
-| `mimeType`       | `emojiToImage` | `"image/png"`                       | `"image/png"` or `"image/webp"`                                    |
-| `background`     | `emojiToImage` | `null`                              | Canvas fill color before drawing                                   |
-| `fontFamily`     | `emojiToImage` | emoji font stack                    | Font stack when `source` is `"native"`                             |
-| `responsive`     | both*          | off                                 | CSS-scalable SVG or retina raster display                          |
-| `srcSet`         | `emojiToImage` | off                                 | Logical widths for `<img srcset>` (`format` image)                 |
-| `sizes`          | `emojiToImage` | —                                   | Optional `<img sizes>` when `srcSet` is set                        |
+| Option           | Applies to     | Default            | Description                                                                                        |
+| ---------------- | -------------- | ------------------ | -------------------------------------------------------------------------------------------------- |
+| `size`           | both           | `72`               | Width and height in pixels                                                                         |
+| `source`         | both*          | `"twemoji"`        | `"native"`*, CDN presets, `{ preset: "fluent", style? }`, or `{ baseUrl, ext?, codePointFormat? }` |
+| `fetch`          | both           | `globalThis.fetch` | Custom fetch implementation                                                                        |
+| `cache`          | both           | `true`             | Cache fetched SVG text in memory                                                                   |
+| `signal`         | both           | —                  | `AbortSignal` for fetch                                                                            |
+| `xmlDeclaration` | `emojiToSvg`   | `false`            | Prefix SVG with `<?xml ...?>`                                                                      |
+| `pixelate`       | both           | off                | Block size in px; `>= 2` pixelates                                                                 |
+| `format`         | `emojiToImage` | `"image"`          | `"image"`, `"blob"`, or `"dataUrl"`                                                                |
+| `mimeType`       | `emojiToImage` | `"image/png"`      | `"image/png"` or `"image/webp"`                                                                    |
+| `background`     | `emojiToImage` | `null`             | Canvas fill color before drawing                                                                   |
+| `fontFamily`     | `emojiToImage` | emoji font stack   | Font stack when `source` is `"native"`                                                             |
+| `responsive`     | both*          | off                | CSS-scalable SVG or retina raster display                                                          |
+| `srcSet`         | `emojiToImage` | off                | Logical widths for `<img srcset>` (`format` image)                                                 |
+| `sizes`          | `emojiToImage` | —                  | Optional `<img sizes>` when `srcSet` is set                                                        |
 
 \* `"native"` applies to `emojiToImage` only. It draws the platform emoji font via canvas (no CDN fetch). Appearance varies by OS/browser; some glyphs may be clipped (see below).
 
 ### Native source clipping
 
-When `source` is `"native"` (the image default), the emoji is drawn as text onto a square canvas at about 85% of `size` and centered with `textBaseline: "middle"`. That centers the typographic em-box, not the visible glyph.
+When `source` is `"native"`, the emoji is drawn as text onto a square canvas at about 85% of `size` and centered with `textBaseline: "middle"`. That centers the typographic em-box, not the visible glyph.
 
 Platform emoji fonts — especially Apple Color Emoji on iOS and other mobile browsers — often sit outside that box. Tall or “extra” glyphs (crowns, hats, some composites) can look cropped or cut in half. The same emoji can look fine on desktop and clipped on a phone.
 
@@ -160,6 +169,7 @@ When you use CDN artwork, attribute the upstream project:
 - [Twemoji](https://github.com/jdecked/twemoji) (CC BY 4.0)
 - [OpenMoji](https://openmoji.org/) (CC BY-SA 4.0)
 - [Noto Emoji](https://github.com/googlefonts/noto-emoji) (Apache 2.0 / OFL)
+- [Fluent Emoji](https://github.com/microsoft/fluentui-emoji) (MIT)
 
 Native rendering uses the host platform’s emoji font and needs no artwork attribution from this package.
 

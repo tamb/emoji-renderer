@@ -45,6 +45,8 @@ export type {
   EmojiToSvgOptions,
   EmojiSource,
   EmojiBaseOptions,
+  FluentEmojiSource,
+  FluentStyle,
   ResponsiveSvg,
   ResponsiveSvgOptions,
 } from "./types.ts";
