@@ -49,6 +49,7 @@
   "scripts": {
     "build": "vp pack",
     "dev": "vp pack --watch",
+    "ci:simulate": "npm ci && npx vp check && npm run test:install-browsers && npm run test && npm run test:coverage && npx vp pack && npm run build-storybook",
     "test": "vp test",
     "test:unit": "vp test --project unit",
     "test:install-browsers": "node scripts/install-playwright-browsers.mts",
