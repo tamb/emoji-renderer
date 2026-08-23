@@ -1,4 +1,4 @@
-import { IncompatibleOptionsError } from "./errors.ts";
+import { IncompatibleOptionsError, RasterizeError } from "./errors.ts";
 import { shouldTryNextSource } from "./fallback.ts";
 import { nativeEmojiToImageBlob } from "./nativeToImage.ts";
 import { emojiToSvg } from "./emojiToSvg.ts";
@@ -103,6 +103,12 @@ async function renderEmojiBlob(options: RenderEmojiBlobOptions): Promise<Blob> {
 }
 
 async function blobToHtmlImage(blob: Blob, renderSize: number): Promise<HTMLImageElement> {
+  // Without HTMLImageElement, loadImageFromUrl falls through to the Node canvas path,
+  // which cannot load blob: object URLs — fail early with a clear error instead.
+  if (typeof Image === "undefined") {
+    throw new RasterizeError('format: "image" requires a browser DOM with HTMLImageElement');
+  }
+
   const objectUrl = URL.createObjectURL(blob);
 
   try {

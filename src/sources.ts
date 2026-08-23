@@ -123,6 +123,7 @@ export async function buildAssetUrlAsync(
   source: EmojiSource = DEFAULT_SVG_SOURCE,
 ): Promise<string> {
   if (isFluentSource(source)) {
+    // fluent.ts embeds a ~194 KB ID map; load it only when a Fluent source is requested.
     const { buildFluentAssetUrl } = await import("./fluent.ts");
     return buildFluentAssetUrl(codePoint, source);
   }

@@ -1,6 +1,7 @@
 import { devices } from "playwright";
 import { defineConfig } from "vite-plus";
 import { playwright } from "vite-plus/test/browser-playwright";
+import { VITEST_DESKTOP_BROWSERS, VITEST_MOBILE_DEVICES } from "./vitest.browsers.ts";
 
 function mobileBrowserInstance(name: string, deviceName: "iPhone 15" | "Pixel 8") {
   const device = devices[deviceName];
@@ -23,6 +24,11 @@ function mobileBrowserInstance(name: string, deviceName: "iPhone 15" | "Pixel 8"
 }
 
 export default defineConfig({
+  // Native canvas peers ship platform .node binaries; exclude them from client-side
+  // dependency optimization so browser Vitest does not try to parse them as JS.
+  optimizeDeps: {
+    exclude: ["@napi-rs/canvas", "@resvg/resvg-js"],
+  },
   staged: {
     "*": "vp check --fix",
   },
@@ -37,6 +43,14 @@ export default defineConfig({
     },
   },
   test: {
+    deps: {
+      optimizer: {
+        client: {
+          // Same exclusion for the browser Vitest project's dep optimizer.
+          exclude: ["@napi-rs/canvas", "@resvg/resvg-js"],
+        },
+      },
+    },
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov"],
@@ -76,7 +90,7 @@ export default defineConfig({
             enabled: true,
             provider: playwright(),
             headless: true,
-            instances: [{ browser: "chromium" }, { browser: "firefox" }, { browser: "webkit" }],
+            instances: VITEST_DESKTOP_BROWSERS.map((browser) => ({ browser })),
           },
         },
       },
@@ -89,10 +103,9 @@ export default defineConfig({
             enabled: true,
             provider: playwright(),
             headless: true,
-            instances: [
-              mobileBrowserInstance("mobile-safari", "iPhone 15"),
-              mobileBrowserInstance("mobile-chrome", "Pixel 8"),
-            ],
+            instances: VITEST_MOBILE_DEVICES.map(({ name, device }) =>
+              mobileBrowserInstance(name, device),
+            ),
           },
         },
       },

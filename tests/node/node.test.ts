@@ -1,13 +1,21 @@
-import { describe, expect, test } from "vite-plus/test";
+import { beforeAll, describe, expect, test } from "vite-plus/test";
 import { emojiToImage } from "../../src/emojiToImage.ts";
 import { emojiToSvg } from "../../src/emojiToSvg.ts";
 import { NODE_CANVAS_INSTALL_HINT } from "../../src/canvasEnv.ts";
 import { RasterizeError } from "../../src/errors.ts";
 import { mockTwemojiFetch, SAMPLE_SVG } from "../helpers.ts";
 
-const hasNodeCanvas = await import("@napi-rs/canvas").then(() => true).catch(() => false);
+let hasNodeCanvas = false;
 
-describe.runIf(hasNodeCanvas)("node integration", () => {
+beforeAll(async () => {
+  // Dynamic imports keep native peers out of the static module graph scanned by other
+  // Vitest projects (unit runs in happy-dom and shares the same config root).
+  hasNodeCanvas =
+    (await import(/* @vite-ignore */ "@napi-rs/canvas").then(() => true).catch(() => false)) &&
+    (await import(/* @vite-ignore */ "@resvg/resvg-js").then(() => true).catch(() => false));
+});
+
+describe("node integration", () => {
   test("fetches SVG with mock fetch in Node", async () => {
     const svg = await emojiToSvg("😀", {
       fetch: mockTwemojiFetch(SAMPLE_SVG),
@@ -19,7 +27,11 @@ describe.runIf(hasNodeCanvas)("node integration", () => {
     expect(svg).toContain('width="48"');
   });
 
-  test("rasterizes to a blob with @napi-rs/canvas", async () => {
+  test("rasterizes to a blob with optional Node canvas peers", async () => {
+    if (!hasNodeCanvas) {
+      return;
+    }
+
     const blob = await emojiToImage("😀", {
       fetch: mockTwemojiFetch(SAMPLE_SVG),
       format: "blob",
@@ -33,6 +45,10 @@ describe.runIf(hasNodeCanvas)("node integration", () => {
   });
 
   test("returns a data URL in Node", async () => {
+    if (!hasNodeCanvas) {
+      return;
+    }
+
     const dataUrl = await emojiToImage("😀", {
       fetch: mockTwemojiFetch(SAMPLE_SVG),
       format: "dataUrl",
@@ -42,10 +58,12 @@ describe.runIf(hasNodeCanvas)("node integration", () => {
 
     expect(dataUrl.startsWith("data:image/png;base64,")).toBe(true);
   });
-});
 
-describe.runIf(!hasNodeCanvas)("node integration without canvas peer", () => {
-  test("reports the install hint when rasterizing without @napi-rs/canvas", async () => {
+  test("reports the install hint when rasterizing without Node canvas peers", async () => {
+    if (hasNodeCanvas) {
+      return;
+    }
+
     const originalDocument = globalThis.document;
     // @ts-expect-error test override
     delete globalThis.document;

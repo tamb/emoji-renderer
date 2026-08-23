@@ -225,7 +225,9 @@ For unit tests in Node without `@napi-rs/canvas`, use a DOM shim such as `happy-
 
 ```bash
 npm install
-npm test
+npm run test:install-browsers   # reads vitest.browsers.ts — same browsers CI installs
+npm test                        # all projects (unit, node, browser, browser-mobile)
+npm run test:unit               # fast unit tests only
 npm run test:node
 npm run test:browser
 npm run test:browser:mobile

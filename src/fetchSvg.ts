@@ -159,6 +159,7 @@ async function fetchSvgResponse(options: FetchSvgResponseOptions): Promise<strin
       }
 
       if (isFluentSource(source)) {
+        // Defer fluent.ts import until a Fluent response is actually being processed.
         const { isFluent3dSource, wrapPngAsSvg } = await import("./fluent.ts");
         if (isFluent3dSource(source)) {
           return wrapPngAsSvg(await blobToDataUrl(await response.blob()));
