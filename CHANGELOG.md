@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Text-default emoji with VS16 (coffin, keycaps, etc.) resolve to VS16-stripped CDN filenames instead of 404ing on `-fe0f` paths.
+- Unit coverage excludes Node-only `canvasEnv.node.ts` and generated files so CI thresholds reflect the happy-dom test project.
 
 ## [1.0.0] - 2026-08-23
 

@@ -55,7 +55,14 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "lcov"],
       include: ["src/**/*.ts"],
-      exclude: ["src/types.ts", "src/index.ts", "src/**/*.test.ts", "src/**/*.stories.ts"],
+      exclude: [
+        "src/types.ts",
+        "src/index.ts",
+        "src/canvasEnv.node.ts",
+        "src/generated/**",
+        "src/**/*.test.ts",
+        "src/**/*.stories.ts",
+      ],
       thresholds: {
         lines: 90,
         statements: 90,

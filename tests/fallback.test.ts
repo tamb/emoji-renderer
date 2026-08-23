@@ -35,4 +35,11 @@ describe("fallback helpers", () => {
     expect(() => throwIfAborted(controller.signal)).toThrowError();
     expect(isAbortError(new DOMException("The operation was aborted.", "AbortError"))).toBe(true);
   });
+
+  test("throwIfAborted rethrows the signal reason when it is an Error", () => {
+    const controller = new AbortController();
+    const reason = new Error("user cancelled");
+    controller.abort(reason);
+    expect(() => throwIfAborted(controller.signal)).toThrow(reason);
+  });
 });
