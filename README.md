@@ -164,6 +164,7 @@ For Node.js tests or scripts, use a DOM implementation such as `happy-dom` or `j
 npm install
 npm test
 npm run test:browser
+npm run test:browser:mobile
 npm run build
 npm run check
 npm run build-storybook

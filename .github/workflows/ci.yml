@@ -31,6 +31,9 @@ jobs:
       - name: Browser tests
         run: npx vp test --project browser
 
+      - name: Mobile browser tests
+        run: npx vp test --project browser-mobile
+
       - name: Pack
         run: npx vp pack
 

@@ -51,6 +51,7 @@
     "dev": "vp pack --watch",
     "test": "vp test --project unit",
     "test:browser": "vp test --project browser",
+    "test:browser:mobile": "vp test --project browser-mobile",
     "test:all": "vp test",
     "test:coverage": "vp test --project unit --coverage",
     "check": "vp check",
