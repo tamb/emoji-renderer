@@ -54,7 +54,9 @@ export async function fetchSvgText(options: FetchSvgOptions): Promise<string> {
   throw lastError ?? new Error("No emoji source succeeded");
 }
 
-async function fetchSvgTextFromSource(options: FetchSvgOptions & { source: EmojiSource }): Promise<string> {
+async function fetchSvgTextFromSource(
+  options: FetchSvgOptions & { source: EmojiSource },
+): Promise<string> {
   const {
     emoji,
     source,

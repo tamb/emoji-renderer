@@ -173,7 +173,11 @@ describe("fetchSvgText", () => {
     });
 
     expect(fetchImpl).toHaveBeenCalledTimes(2);
-    expect(fetchImpl).toHaveBeenNthCalledWith(2, `${NOTO_BASE}/emoji_u1f600.svg`, expect.any(Object));
+    expect(fetchImpl).toHaveBeenNthCalledWith(
+      2,
+      `${NOTO_BASE}/emoji_u1f600.svg`,
+      expect.any(Object),
+    );
   });
 
   test("throws IncompatibleOptionsError for unknown fallbacks", async () => {

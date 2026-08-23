@@ -103,16 +103,16 @@ Fluent assets are looked up by Unicode from a generated map of the official [mic
 | `fallbackToNative` | `emojiToImage` | `false`            | Draw the system emoji font if `source` and `fallbacks` all fail                                    |
 | `fetch`            | both           | `globalThis.fetch` | Custom fetch implementation                                                                        |
 | `cache`            | both           | `true`             | Cache fetched SVG text in memory                                                                   |
-| `signal`         | both           | —                  | `AbortSignal` for fetch                                                                            |
-| `xmlDeclaration` | `emojiToSvg`   | `false`            | Prefix SVG with `<?xml ...?>`                                                                      |
-| `pixelate`       | both           | off                | Block size in px; `>= 2` pixelates                                                                 |
-| `format`         | `emojiToImage` | `"image"`          | `"image"`, `"blob"`, or `"dataUrl"`                                                                |
-| `mimeType`       | `emojiToImage` | `"image/png"`      | `"image/png"` or `"image/webp"`                                                                    |
-| `background`     | `emojiToImage` | `null`             | Canvas fill color before drawing                                                                   |
-| `fontFamily`     | `emojiToImage` | emoji font stack   | Font stack when `source` is `"native"`                                                             |
-| `responsive`     | both*          | off                | CSS-scalable SVG or retina raster display                                                          |
-| `srcSet`         | `emojiToImage` | off                | Logical widths for `<img srcset>` (`format` image)                                                 |
-| `sizes`          | `emojiToImage` | —                  | Optional `<img sizes>` when `srcSet` is set                                                        |
+| `signal`           | both           | —                  | `AbortSignal` for fetch                                                                            |
+| `xmlDeclaration`   | `emojiToSvg`   | `false`            | Prefix SVG with `<?xml ...?>`                                                                      |
+| `pixelate`         | both           | off                | Block size in px; `>= 2` pixelates                                                                 |
+| `format`           | `emojiToImage` | `"image"`          | `"image"`, `"blob"`, or `"dataUrl"`                                                                |
+| `mimeType`         | `emojiToImage` | `"image/png"`      | `"image/png"` or `"image/webp"`                                                                    |
+| `background`       | `emojiToImage` | `null`             | Canvas fill color before drawing                                                                   |
+| `fontFamily`       | `emojiToImage` | emoji font stack   | Font stack when `source` is `"native"`                                                             |
+| `responsive`       | both*          | off                | CSS-scalable SVG or retina raster display                                                          |
+| `srcSet`           | `emojiToImage` | off                | Logical widths for `<img srcset>` (`format` image)                                                 |
+| `sizes`            | `emojiToImage` | —                  | Optional `<img sizes>` when `srcSet` is set                                                        |
 
 \* `"native"` applies to `emojiToImage` only. It draws the platform emoji font via canvas (no CDN fetch). Appearance varies by OS/browser; some glyphs may be clipped (see below).
 

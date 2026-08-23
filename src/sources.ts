@@ -4,7 +4,12 @@ import type { CodePointFormat, EmojiCdnPreset, EmojiSource } from "./types.ts";
 
 export const DEFAULT_SVG_SOURCE: EmojiCdnPreset = "twemoji";
 export const DEFAULT_IMAGE_SOURCE: EmojiCdnPreset = "twemoji";
-export const EMOJI_CDN_PRESETS: readonly EmojiCdnPreset[] = ["twemoji", "openmoji", "noto", "fluent"];
+export const EMOJI_CDN_PRESETS: readonly EmojiCdnPreset[] = [
+  "twemoji",
+  "openmoji",
+  "noto",
+  "fluent",
+];
 
 type CodePointCdnPreset = Exclude<EmojiCdnPreset, "fluent">;
 
