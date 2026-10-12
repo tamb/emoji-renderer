@@ -96,7 +96,7 @@ export default defineConfig({
     entry: ["src/index.ts", "src/emojiToSvg.ts", "src/emojiToImage.ts", "src/canvasEnv.node.ts"],
     plugins: [publishNodeCanvasAdapter()],
     dts: {
-      tsgo: true,
+      generator: "tsgo",
     },
     exports: false,
     deps: {
@@ -104,6 +104,9 @@ export default defineConfig({
     },
   },
   test: {
+    // Node and browser projects must not share a Vite server. A shared server
+    // would scan the Node canvas adapter and its .node binaries.
+    sharedViteServer: false,
     deps: {
       optimizer: {
         client: {
