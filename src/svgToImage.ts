@@ -95,7 +95,11 @@ export async function svgToImageBlob(options: SvgToImageOptions): Promise<Blob> 
     await drawImageToContext(context, image, size, background, pixelate);
     return canvasToBlob(canvas, mimeType);
   } catch (error) {
-    throw error instanceof RasterizeError ? error : new RasterizeError(String(error));
+    if (error instanceof RasterizeError) {
+      throw error;
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    throw new RasterizeError(message, { cause: error });
   }
 }
 
