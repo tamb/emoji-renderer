@@ -23,6 +23,66 @@ function mobileBrowserInstance(name: string, deviceName: "iPhone 15" | "Pixel 8"
   };
 }
 
+const NODE_CANVAS_SOURCE_SPECIFIERS = ['"./canvasEnv.node.ts"', "'./canvasEnv.node.ts'"] as const;
+
+function publishNodeCanvasAdapter() {
+  return {
+    name: "publish-node-canvas-adapter",
+    generateBundle(
+      _options: unknown,
+      bundle: Record<
+        string,
+        { type: string; code?: string; facadeModuleId?: string | null; fileName?: string }
+      >,
+    ) {
+      const chunks = Object.values(bundle).filter(
+        (
+          item,
+        ): item is {
+          type: "chunk";
+          code: string;
+          facadeModuleId: string | null;
+          fileName: string;
+        } =>
+          item.type === "chunk" &&
+          typeof item.code === "string" &&
+          typeof item.fileName === "string",
+      );
+      const nodeChunk = chunks.find(
+        (item) =>
+          item.fileName.endsWith(".mjs") && item.facadeModuleId?.endsWith("canvasEnv.node.ts"),
+      );
+      if (!nodeChunk) {
+        return;
+      }
+
+      const publishedSpecifier = `"./${nodeChunk.fileName}"`;
+      let rewrote = false;
+      for (const item of chunks) {
+        if (!item.fileName.endsWith(".mjs") || item === nodeChunk) {
+          continue;
+        }
+        for (const specifier of NODE_CANVAS_SOURCE_SPECIFIERS) {
+          if (!item.code.includes(specifier)) {
+            continue;
+          }
+          item.code = item.code.replaceAll(specifier, publishedSpecifier);
+          rewrote = true;
+        }
+      }
+
+      const alreadyPublished = chunks.some(
+        (item) => item.fileName.endsWith(".mjs") && item.code.includes(publishedSpecifier),
+      );
+      if (!rewrote && !alreadyPublished) {
+        throw new Error(
+          "Expected a published chunk to dynamically import ./canvasEnv.node.ts so it can be rewritten to the emitted adapter",
+        );
+      }
+    },
+  };
+}
+
 export default defineConfig({
   // Native canvas peers ship platform .node binaries; exclude them from client-side
   // dependency optimization so browser Vitest does not try to parse them as JS.
@@ -33,9 +93,10 @@ export default defineConfig({
     "*": "vp check --fix",
   },
   pack: {
-    entry: ["src/index.ts", "src/emojiToSvg.ts", "src/emojiToImage.ts"],
+    entry: ["src/index.ts", "src/emojiToSvg.ts", "src/emojiToImage.ts", "src/canvasEnv.node.ts"],
+    plugins: [publishNodeCanvasAdapter()],
     dts: {
-      tsgo: true,
+      generator: "tsgo",
     },
     exports: false,
     deps: {
@@ -43,6 +104,9 @@ export default defineConfig({
     },
   },
   test: {
+    // Node and browser projects must not share a Vite server. A shared server
+    // would scan the Node canvas adapter and its .node binaries.
+    sharedViteServer: false,
     deps: {
       optimizer: {
         client: {

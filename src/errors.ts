@@ -39,10 +39,13 @@ export class EmojiFetchError extends Error {
   }
 }
 
+export const NODE_CANVAS_INSTALL_HINT =
+  'Install optional peers "@napi-rs/canvas" and "@resvg/resvg-js" to rasterize emoji images in Node.js';
+
 export class RasterizeError extends Error {
   readonly name = "RasterizeError";
 
-  constructor(message = "Unable to rasterize SVG to an image") {
-    super(message);
+  constructor(message = "Unable to rasterize SVG to an image", options?: { cause?: unknown }) {
+    super(message, options);
   }
 }

@@ -25,14 +25,14 @@ jobs:
       - name: Install Playwright browsers
         run: npm run test:install-browsers
 
+      - name: Pack
+        run: npx vp pack
+
       - name: Test
         run: npm run test
 
       - name: Unit coverage
         run: npm run test:coverage
-
-      - name: Pack
-        run: npx vp pack
 
       - name: Build Storybook
         run: npm run build-storybook

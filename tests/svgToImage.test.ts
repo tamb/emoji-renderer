@@ -192,10 +192,38 @@ describe("svgToImage", () => {
     globalThis.OffscreenCanvas = originalOffscreenCanvas;
   });
 
-  test("throws RasterizeError when canvas is unavailable", async () => {
+  test("surfaces Node canvas loader failures that are not a missing peer", async () => {
     resetNodeCanvasModuleForTests();
     setNodeCanvasLoaderForTests(async () => {
-      throw new Error("missing @napi-rs/canvas");
+      throw new Error("canvas binary failed to load");
+    });
+
+    const originalDocument = globalThis.document;
+    const originalOffscreenCanvas = globalThis.OffscreenCanvas;
+    // @ts-expect-error test override
+    delete globalThis.document;
+    // @ts-expect-error test override
+    delete globalThis.OffscreenCanvas;
+
+    try {
+      await expect(
+        svgToImageBlob({
+          svg: SAMPLE_SVG,
+        }),
+      ).rejects.toThrow("canvas binary failed to load");
+    } finally {
+      globalThis.document = originalDocument;
+      globalThis.OffscreenCanvas = originalOffscreenCanvas;
+      resetNodeCanvasModuleForTests();
+    }
+  });
+
+  test("throws the install hint when the Node canvas peer cannot be resolved", async () => {
+    resetNodeCanvasModuleForTests();
+    setNodeCanvasLoaderForTests(async () => {
+      const error = new Error("Cannot find package '@napi-rs/canvas'");
+      Object.assign(error, { code: "ERR_MODULE_NOT_FOUND" });
+      throw error;
     });
 
     const originalDocument = globalThis.document;
