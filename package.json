@@ -61,7 +61,7 @@
     "generate:fluent-map": "node scripts/generate-fluent-map.mts",
     "storybook": "storybook dev -p 6006 --no-open",
     "build-storybook": "storybook build",
-    "prepublishOnly": "vp run build",
+    "prepublishOnly": "vp test && vp run build",
     "prepare": "vp config"
   },
   "dependencies": {
