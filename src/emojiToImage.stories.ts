@@ -1,6 +1,15 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
 import type { EmojiCdnPreset, EmojiImageFormat, EmojiImageSource } from "./types.ts";
 import { emojiToImage } from "./emojiToImage.ts";
+import { nearestPixelation, pixelationPresets } from "./pixelation.ts";
+import type { PixelationOptions } from "./pixelation.ts";
+import {
+  formatPixelationDemo,
+  pixelationDemoArgs,
+  pixelationDemoArgTypes,
+  pixelationFromDemoArgs,
+} from "./pixelationDemo.ts";
+import type { PixelationDemoArgs } from "./pixelationDemo.ts";
 import { isEmojiCdnPreset } from "./sources.ts";
 
 interface EmojiToImageStoryArgs {
@@ -10,6 +19,8 @@ interface EmojiToImageStoryArgs {
   mimeType: "image/png" | "image/webp";
   background: string;
   pixelate: number;
+  pixelationPreset: "off" | "smooth" | "nearest";
+  pixelationBlockSize: number;
   cache: boolean;
   sourceMode: "native" | "twemoji" | "openmoji" | "noto" | "fluent" | "custom";
   fluentStyle: "color" | "flat" | "high-contrast" | "3d";
@@ -34,8 +45,10 @@ const meta = {
     mimeType: "image/png",
     background: "",
     pixelate: 0,
+    pixelationPreset: "off",
+    pixelationBlockSize: 8,
     cache: true,
-    sourceMode: "twemoji",
+    sourceMode: "native",
     fluentStyle: "color",
     fallbacks: "",
     fallbackToNative: false,
@@ -75,7 +88,18 @@ const meta = {
     pixelate: {
       control: { type: "number", min: 0, max: 32, step: 1 },
       description:
-        "Block size in output pixels. `0` or `1` disables pixelation; `8` on a 72px emoji yields ~9×9 blocks. Default: off.",
+        "Deprecated and removed in v2. `pixelate` is a number; v2 accepts only the `pixelation` object. Values `>= 2` are coerced to `{ blockSize }` with smooth defaults (that ToNumber coercion goes away in v2). Values below 2 stay off. Ignored for the draw when a pixelation preset is selected, but still warns.",
+    },
+    pixelationPreset: {
+      control: "select",
+      options: ["off", "smooth", "nearest"],
+      description:
+        "Pixelation preset. `off` leaves `pixelate` in charge. `smooth` and `nearest` build a `pixelation` object and override its `blockSize`.",
+    },
+    pixelationBlockSize: {
+      control: { type: "number", min: 2, max: 32, step: 1 },
+      description:
+        "Finite `blockSize` applied when a pixelation preset is selected. Must be >= 2. Ignored when the preset is off.",
     },
     cache: {
       control: "boolean",
@@ -143,16 +167,16 @@ const meta = {
     docs: {
       description: {
         component: `
-Fetches CDN SVG artwork (or draws native system emoji), rasterizes via canvas, and returns an image. Defaults to Twemoji.
+Fetches CDN SVG artwork (or draws native system emoji), rasterizes via canvas, and returns an image. The function defaults to Twemoji. These stories use \`source: "native"\` unless the story is demonstrating a CDN or Fluent source.
 
-**Native clipping:** \`"native"\` draws the system emoji font onto a square canvas. Some glyphs can look cropped or cut in half — especially on mobile, where Apple Color Emoji and other platform fonts sit outside the typographic box. The default \`"twemoji"\` source (and other CDN presets) draw fitted, uncropped artwork.
+**Native clipping:** \`"native"\` draws the system emoji font onto a square canvas. Some glyphs can look cropped or cut in half — especially on mobile, where Apple Color Emoji and other platform fonts sit outside the typographic box. CDN presets draw fitted, uncropped artwork.
 
 ## Usage
 
 \`\`\`ts
 import { emojiToImage } from "emoji-renderer/emojiToImage";
 
-const image = await emojiToImage("😀", { size: 48 }); // Twemoji by default
+const image = await emojiToImage("😀", { source: "native", size: 48 });
 document.body.append(image);
 \`\`\`
 
@@ -161,28 +185,29 @@ Tree-shakable import from the package root also works:
 \`\`\`ts
 import { emojiToImage } from "emoji-renderer";
 
-const image = await emojiToImage("🎉");
+const image = await emojiToImage("🎉", { source: "native" });
 \`\`\`
 
 ## Examples
 
-**HTMLImageElement (default, Twemoji)**
+**HTMLImageElement**
 
 \`\`\`ts
-const image = await emojiToImage("😀", { size: 48 });
+const image = await emojiToImage("😀", { source: "native", size: 48 });
 \`\`\`
 
 **Blob or data URL output**
 
 \`\`\`ts
-const blob = await emojiToImage("😀", { format: "blob" });
-const dataUrl = await emojiToImage("😀", { format: "dataUrl" });
+const blob = await emojiToImage("😀", { source: "native", format: "blob" });
+const dataUrl = await emojiToImage("😀", { source: "native", format: "dataUrl" });
 \`\`\`
 
 **Responsive — retina-sharp with CSS display size**
 
 \`\`\`ts
 const image = await emojiToImage("😀", {
+  source: "native",
   size: 48,
   responsive: true, // dpr: auto, display: css
 });
@@ -193,6 +218,7 @@ document.body.append(image);
 
 \`\`\`ts
 const image = await emojiToImage("😀", {
+  source: "native",
   size: 32,
   responsive: {
     dpr: 2,
@@ -206,6 +232,7 @@ const image = await emojiToImage("😀", {
 
 \`\`\`ts
 const image = await emojiToImage("😀", {
+  source: "native",
   size: 48,
   srcSet: [24, 48, 96],
   sizes: "(max-width: 600px) 24px, 48px",
@@ -234,14 +261,25 @@ const image = await emojiToImage("👨‍👩‍👧", {
 });
 \`\`\`
 
-**Pixelated output**
+**Pixelated**
+
+Spread a preset, then set \`blockSize\`. \`pixelationPresets.nearest\` is nearest-neighbor on both draws. \`pixelationPresets.smooth\` is the bilinear shrink. The **Pixelated** story uses this call. **Custom pixelation stages** overrides individual stage fields. **All pixelation options** exposes every field.
 
 \`\`\`ts
-const image = await emojiToImage("👾", {
+import { emojiToImage, pixelationPresets } from "emoji-renderer";
+
+const blockSize = 12;
+
+const image = await emojiToImage("🧟", {
+  source: "native",
   size: 96,
-  pixelate: 8,
-  background: "#1a1a2e",
+  background: "#111111",
+  pixelation: {
+    ...pixelationPresets.nearest,
+    blockSize,
+  },
 });
+document.body.append(image);
 \`\`\`
 
 **Options**
@@ -253,16 +291,114 @@ const image = await emojiToImage("👾", {
 | \`fallbacks\` | \`("twemoji" \\| "openmoji" \\| "noto" \\| "fluent")[]\` | none | CDN presets to try after \`source\` fails |
 | \`fallbackToNative\` | \`boolean\` | \`false\` | Draw the system emoji font if CDN sources all fail |
 | \`fetch\` | \`typeof fetch\` | \`globalThis.fetch\` | Custom fetch (not exposed here) |
+| \`timeout\` | \`number\` | \`8000\` | Per-request fetch timeout in milliseconds, composed with \`signal\` (not exposed here) |
+| \`retries\` | \`number\` | \`2\` | Same-source retries for transient failures: network, HTTP 429, 5xx (not exposed here) |
 | \`cache\` | \`boolean\` | \`true\` | Cache fetched SVG text |
 | \`signal\` | \`AbortSignal\` | — | Abort in-flight fetch (not exposed here) |
-| \`format\` | \`"image" \\| "blob" \\| "dataUrl"\` | \`"image"\` | Return type |
+| \`format\` | \`"image" \\| "blob" \\| "dataUrl"\` | \`"image"\` | Return type. \`"image"\` is an \`HTMLImageElement\`, \`"blob"\` a \`Blob\`, \`"dataUrl"\` a string |
 | \`mimeType\` | \`"image/png" \\| "image/webp"\` | \`"image/png"\` | Output MIME type |
-| \`background\` | \`string \\| null\` | \`null\` | Canvas fill before drawing |
-| \`pixelate\` | \`number\` | off | Block size in px; \`>= 2\` enables pixel-art upscaling |
+| \`background\` | \`string \\| null\` | \`null\` | Canvas fill before drawing. Also the fallback for an omitted stage \`background\` |
+| \`pixelate\` | \`number\` | off | Deprecated, removed in v2. A \`number\`, not a \`PixelationOptions\` object. See **PixelationOptions** |
+| \`pixelation\` | \`PixelationOptions\` | off | See **PixelationOptions** below. Used as given when \`pixelate\` is also set |
 | \`fontFamily\` | \`string\` | emoji stack | Font stack when \`source\` is \`"native"\` |
-| \`responsive\` | \`boolean \\| { dpr, display, style? }\` | off | Retina rendering + CSS display sizing |
-| \`srcSet\` | \`number[]\` | off | Logical widths for \`<img srcset>\` (requires \`format: "image"\`) |
-| \`sizes\` | \`string\` | — | Optional \`<img sizes>\` attribute |
+| \`responsive\` | \`boolean \\| ResponsiveImageOptions\` | off | Retina rendering and CSS display sizing. See **responsive** below |
+| \`srcSet\` | \`number[]\` | off | Logical widths for \`<img srcset>\`. Requires \`format: "image"\` |
+| \`sizes\` | \`string\` | — | Optional \`<img sizes>\` attribute when \`srcSet\` is set |
+
+### \`source\`
+
+| Shape | Fields |
+| --- | --- |
+| \`"twemoji" \\| "openmoji" \\| "noto" \\| "fluent"\` | CDN preset. Default \`"twemoji"\` |
+| \`"native"\` | System emoji font. \`emojiToImage\` only |
+| \`{ preset: "fluent", style?, baseUrl? }\` | \`style\`: \`"flat" \\| "color" \\| "high-contrast" \\| "3d"\` (default \`"color"\`). \`"3d"\` fetches PNG and wraps it in SVG. \`baseUrl\` overrides the pinned Fluent assets root |
+| \`{ baseUrl, ext?, codePointFormat? }\` | \`ext\` defaults to \`".svg"\`. \`codePointFormat\`: \`"twemoji" \\| "openmoji" \\| "noto"\` (default \`"twemoji"\`) |
+
+\`fallbacks\` accepts the CDN presets only. Duplicates of \`source\` are skipped.
+
+### \`responsive\`
+
+\`ResponsiveImageOptions\`:
+
+| Field | Type | \`responsive: true\` |
+| --- | --- | --- |
+| \`dpr\` | \`number \\| "auto"\` | Device pixel ratio |
+| \`display\` | \`"fixed" \\| "css"\` | \`"css"\` |
+| \`style.width\` | \`string\` | logical size in px |
+| \`style.height\` | \`string\` | logical size in px |
+| \`style.objectFit\` | \`"contain" \\| "cover" \\| "fill"\` | omitted |
+
+Off means \`dpr: 1\` and \`display: "fixed"\`. An object defaults \`dpr\` to \`"auto"\` and \`display\` to \`"css"\`.
+
+## PixelationOptions
+
+Open **Pixelated** to spread \`pixelationPresets.nearest\` or \`pixelationPresets.smooth\` and set \`blockSize\`. Open **Custom pixelation stages** to override individual stage fields. Open **All pixelation options** to set every field. Each control there is named \`pixelation.blockSize\`, \`pixelation.downscale.[field]\`, or \`pixelation.upscale.[field]\`.
+
+This is the whole object. Comments are the type references.
+
+\`\`\`ts
+import type {
+  PixelationDownscaleOptions,
+  PixelationOptions,
+  PixelationRounding,
+  PixelationScaleOptions,
+  PixelationSmoothingQuality,
+} from "emoji-renderer";
+
+const pixelation = {
+  blockSize: 8, // number — pixelation.blockSize. Finite, >= 2
+  downscale: {
+    smoothing: true, // boolean — pixelation.downscale.smoothing. Default true
+    quality: "low" as PixelationSmoothingQuality, // "low" | "medium" | "high" — pixelation.downscale.quality
+    rounding: "floor" as PixelationRounding, // "floor" | "round" — pixelation.downscale.rounding
+    background: null, // string | null — pixelation.downscale.background
+  } satisfies PixelationDownscaleOptions,
+  upscale: {
+    smoothing: false, // boolean — pixelation.upscale.smoothing. Default false
+    quality: "low" as PixelationSmoothingQuality, // pixelation.upscale.quality
+    background: "#1a1a2e", // string | null — pixelation.upscale.background
+  } satisfies PixelationScaleOptions,
+} satisfies PixelationOptions;
+\`\`\`
+
+\`pixelation.blockSize\` must be a finite \`number\` \`>= 2\`. Any other value throws \`IncompatibleOptionsError\` (\`pixelation.blockSize must be a finite number >= 2\`). \`{ blockSize: 8 }\` with both stages omitted matches \`pixelate: 8\` on an even split: downscale smoothing on, \`quality: "low"\`, \`rounding: "floor"\`; upscale smoothing off, \`quality: "low"\`. Cell count is \`max(1, rounding(size / blockSize))\`, then that canvas is stretched to \`size\`.
+
+\`pixelation.downscale.quality\` and \`pixelation.upscale.quality\` are \`PixelationSmoothingQuality\`. \`"low"\` is bilinear. Canvas ignores \`quality\` while that stage's \`smoothing\` is false, and still stores the value. \`pixelation.downscale.rounding\` is the only \`PixelationRounding\` field.
+
+Omit \`pixelation.downscale.background\` or \`pixelation.upscale.background\` to use the top-level \`background\`. \`null\` stays transparent. That omit-versus-null rule stays in v2. With \`source: "native"\`, the glyph canvas stays transparent and these stage backgrounds are the only fills.
+
+\`pixelate\` is a \`number\` and is removed in v2. It is not copied into \`blockSize\` or either stage. Below 2 it stays off. \`>= 2\` warns once, then becomes \`{ blockSize: pixelate }\` only when \`pixelation\` is omitted. The \`>=\` check uses JavaScript ToNumber. The warning is: \`pixelate is deprecated and will be removed in a future major version. Use pixelation: { blockSize: N } or smoothPixelation instead.\`
+
+\`\`\`ts
+const smoothPixelation = {
+  blockSize: 8,
+  downscale: { smoothing: true, quality: "low", rounding: "floor" },
+  upscale: { smoothing: false, quality: "low" },
+} satisfies PixelationOptions;
+
+const nearestPixelation = {
+  blockSize: 8,
+  downscale: { smoothing: false, quality: "low", rounding: "round" },
+  upscale: { smoothing: false, quality: "low" },
+} satisfies PixelationOptions;
+
+const pixelationPresets = {
+  smooth: smoothPixelation,
+  nearest: nearestPixelation,
+};
+\`\`\`
+
+## Errors
+
+| Error | When |
+| --- | --- |
+| \`InvalidEmojiError\` | Empty or invalid emoji input |
+| \`EmojiNotFoundError\` | Asset missing (HTTP 404/410, unmapped Fluent glyph) |
+| \`EmojiFetchError\` | Transient fetch failure after \`retries\` (network, HTTP 429/5xx, timeout) |
+| \`IncompatibleOptionsError\` | \`pixelation.blockSize must be a finite number >= 2\`, or \`srcSet requires format: "image"\` |
+| \`RasterizeError\` | Canvas or image rasterization failed |
+
+\`EmojiNotFoundError\` and \`EmojiFetchError\` try \`fallbacks\` when those are set. An aborted \`signal\` does not.
         `,
       },
     },
@@ -304,7 +440,20 @@ function parseSrcSet(value: string): number[] | undefined {
   return widths.length > 0 ? widths : undefined;
 }
 
-function renderImagePreview(args: EmojiToImageStoryArgs): HTMLDivElement {
+function storyPixelation(args: EmojiToImageStoryArgs): PixelationOptions | undefined {
+  if (args.pixelationPreset === "smooth" || args.pixelationPreset === "nearest") {
+    return {
+      ...pixelationPresets[args.pixelationPreset],
+      blockSize: args.pixelationBlockSize,
+    };
+  }
+  return undefined;
+}
+
+function renderImagePreviewWith(
+  args: EmojiToImageStoryArgs,
+  pixelationOverride?: PixelationOptions,
+): HTMLDivElement {
   const root = document.createElement("div");
   root.style.display = "grid";
   root.style.gap = "12px";
@@ -332,12 +481,28 @@ function renderImagePreview(args: EmojiToImageStoryArgs): HTMLDivElement {
 
   root.append(status, preview, details);
 
+  const pixelation = pixelationOverride ?? storyPixelation(args);
+
+  if (pixelationOverride) {
+    root.style.maxWidth = "48rem";
+    const objectView = document.createElement("pre");
+    objectView.style.margin = "0";
+    objectView.style.padding = "12px";
+    objectView.style.borderRadius = "8px";
+    objectView.style.background = "color-mix(in srgb, CanvasText 8%, Canvas)";
+    objectView.style.fontSize = "12px";
+    objectView.style.whiteSpace = "pre-wrap";
+    objectView.textContent = formatPixelationDemo(pixelationOverride);
+    root.append(objectView);
+  }
+
   void emojiToImage(args.emoji, {
     size: args.size,
     format: args.format,
     mimeType: args.mimeType,
     background: args.background || null,
-    pixelate: args.pixelate >= 2 ? args.pixelate : undefined,
+    pixelate: pixelationOverride === undefined && args.pixelate >= 2 ? args.pixelate : undefined,
+    pixelation,
     cache: args.cache,
     source: resolveSource(args),
     fallbacks: parseFallbacks(args.fallbacks),
@@ -395,6 +560,10 @@ function renderImagePreview(args: EmojiToImageStoryArgs): HTMLDivElement {
   return root;
 }
 
+function renderImagePreview(args: EmojiToImageStoryArgs): HTMLDivElement {
+  return renderImagePreviewWith(args);
+}
+
 export const Default: Story = {
   render: renderImagePreview,
 };
@@ -410,7 +579,7 @@ export const BlobOutput: Story = {
       description: {
         story: `
 \`\`\`ts
-const blob = await emojiToImage("🎉", { format: "blob" });
+const blob = await emojiToImage("🎉", { source: "native", format: "blob" });
 // blob.type === "image/png"
 \`\`\`
         `,
@@ -431,7 +600,7 @@ export const DataUrlOutput: Story = {
       description: {
         story: `
 \`\`\`ts
-const dataUrl = await emojiToImage("🌈", { format: "dataUrl" });
+const dataUrl = await emojiToImage("🌈", { source: "native", format: "dataUrl" });
 img.src = dataUrl;
 \`\`\`
         `,
@@ -454,12 +623,109 @@ export const WebpMimeType: Story = {
 export const Pixelated: Story = {
   name: "Pixelated",
   args: {
-    emoji: "👾",
+    emoji: "🧟",
     size: 96,
-    pixelate: 8,
-    background: "#1a1a2e",
+    pixelate: 0,
+    pixelationPreset: "nearest",
+    pixelationBlockSize: 12,
+    background: "#111111",
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: `
+\`pixelationPreset\` chooses \`pixelationPresets.nearest\` or \`pixelationPresets.smooth\`. \`pixelationBlockSize\` replaces that preset's \`blockSize\` and must be \`>= 2\`. It is ignored while the preset is \`off\`.
+
+\`\`\`ts
+import { emojiToImage, pixelationPresets } from "emoji-renderer";
+
+const blockSize = 12;
+
+const image = await emojiToImage("🧟", {
+  source: "native",
+  size: 96,
+  background: "#111111",
+  pixelation: {
+    ...pixelationPresets.nearest,
+    blockSize,
+  },
+});
+\`\`\`
+        `,
+      },
+    },
   },
   render: renderImagePreview,
+};
+
+export const CustomPixelationStages: Story = {
+  name: "Custom pixelation stages",
+  args: {
+    emoji: "🧟",
+    size: 96,
+    background: "#ffffff",
+    pixelate: 0,
+    pixelationPreset: "off",
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: `
+\`quality\` has no effect while that stage's \`smoothing\` is off. An explicit stage \`background: null\` stays transparent even when the top-level background is set. \`pixelation\` wins when \`pixelate\` is also passed.
+
+\`\`\`ts
+import { emojiToImage, nearestPixelation } from "emoji-renderer";
+
+await emojiToImage("🧟", {
+  source: "native",
+  size: 96,
+  background: "#fff",
+  pixelation: {
+    ...nearestPixelation,
+    blockSize: 6,
+    downscale: { ...nearestPixelation.downscale, background: null },
+    upscale: { smoothing: true, quality: "high" },
+  },
+});
+\`\`\`
+        `,
+      },
+    },
+  },
+  render: (args) =>
+    renderImagePreviewWith(args, {
+      ...nearestPixelation,
+      blockSize: 6,
+      downscale: { ...nearestPixelation.downscale, background: null },
+      upscale: { smoothing: true, quality: "high" },
+    }),
+};
+
+export const AllPixelationOptions: StoryObj<EmojiToImageStoryArgs & PixelationDemoArgs> = {
+  name: "All pixelation options",
+  args: {
+    emoji: "🧟",
+    size: 96,
+    background: "#ffffff",
+    pixelate: 0,
+    pixelationPreset: "off",
+    ...pixelationDemoArgs,
+    "pixelation.downscale.quality": "high",
+    "pixelation.downscale.rounding": "round",
+    "pixelation.downscale.background": "omit",
+    "pixelation.upscale.quality": "high",
+    "pixelation.upscale.background": "omit",
+  },
+  argTypes: pixelationDemoArgTypes,
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Every `pixelation` field is a control. `omit` drops that stage `background` from the object.",
+      },
+    },
+  },
+  render: (args) => renderImagePreviewWith(args, pixelationFromDemoArgs(args)),
 };
 
 export const CustomBackground: Story = {
@@ -468,30 +734,6 @@ export const CustomBackground: Story = {
     emoji: "🌈",
     size: 96,
     background: "#111827",
-  },
-  render: renderImagePreview,
-};
-
-export const NativeSource: Story = {
-  name: "Native system emoji",
-  args: {
-    emoji: "😀",
-    size: 96,
-    sourceMode: "native",
-  },
-  parameters: {
-    docs: {
-      description: {
-        story: `
-\`\`\`ts
-const image = await emojiToImage("😀", {
-  source: "native",
-  size: 96,
-});
-\`\`\`
-        `,
-      },
-    },
   },
   render: renderImagePreview,
 };
@@ -563,6 +805,7 @@ export const ResponsiveImage: Story = {
         story: `
 \`\`\`ts
 const image = await emojiToImage("😀", {
+  source: "native",
   size: 48,
   responsive: true,
 });

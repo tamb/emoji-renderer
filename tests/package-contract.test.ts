@@ -35,7 +35,7 @@ describe("package publish contract", () => {
     };
 
     expect(pkg.name).toBe("emoji-renderer");
-    expect(pkg.version).toBe("1.0.1");
+    expect(pkg.version).toBe("1.1.0");
     expect(pkg.type).toBe("module");
     expect(pkg.sideEffects).toBe(false);
     expect(pkg.files).toContain("dist");

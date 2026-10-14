@@ -1,3 +1,5 @@
+import type { PixelationOptions } from "./pixelation.ts";
+
 export type CodePointFormat = "twemoji" | "openmoji" | "noto";
 
 export type FluentStyle = "flat" | "color" | "high-contrast" | "3d";
@@ -53,11 +55,27 @@ export interface EmojiToSvgOptions extends EmojiBaseOptions {
   xmlDeclaration?: boolean;
   responsive?: ResponsiveSvg;
   /**
-   * Block size in output pixels. Values >= 2 rasterize the emoji and embed the
-   * pixelated PNG inside an SVG wrapper (Twemoji paths are vector and cannot be
-   * pixelated directly).
+   * @deprecated Removed in v2. Use `pixelation`.
+   *
+   * `pixelate` is a `number`. `pixelation` is a `PixelationOptions` object.
+   * Those are different types and are not merged: when both are set, the object
+   * is used as given and this number is not copied into `blockSize` or either stage.
+   *
+   * Until v2, values `>= 2` rasterize the emoji and embed the pixelated PNG
+   * inside an SVG wrapper (Twemoji paths are vector and cannot be pixelated
+   * directly). That number is coerced to `{ blockSize: pixelate }` with smooth
+   * defaults (bilinear downscale, nearest upscale, `rounding: "floor"`).
+   * Values below 2 mean off, do not warn, and are not coerced. The `>=` check
+   * uses JavaScript ToNumber, so a numeric string counts as on. v2 removes
+   * this option, that coercion, and that ToNumber check.
    */
   pixelate?: number;
+  /**
+   * Downscale and upscale settings. Wins over `pixelate` when both are set.
+   * `blockSize` must be a finite number `>= 2` (not coerced from a string).
+   * Omitted stages use smooth defaults. See `smoothPixelation`.
+   */
+  pixelation?: PixelationOptions;
 }
 
 export type EmojiImageFormat = "image" | "blob" | "dataUrl";
@@ -83,8 +101,27 @@ export interface EmojiToImageOptions extends Omit<EmojiBaseOptions, "source"> {
   format?: EmojiImageFormat;
   mimeType?: "image/png" | "image/webp";
   background?: string | null;
-  /** Block size in output pixels. Values >= 2 produce a pixel-art look. Default: off. */
+  /**
+   * @deprecated Removed in v2. Use `pixelation`.
+   *
+   * `pixelate` is a `number`. `pixelation` is a `PixelationOptions` object.
+   * Those are different types and are not merged: when both are set, the object
+   * is used as given and this number is not copied into `blockSize` or either stage.
+   *
+   * Until v2, values `>= 2` are coerced to `{ blockSize: pixelate }` and drawn
+   * with smooth defaults (bilinear downscale, nearest upscale, `rounding: "floor"`).
+   * Values below 2 mean off, do not warn, and are not coerced. The `>=` check
+   * uses JavaScript ToNumber, so a numeric string counts as on. v2 removes
+   * this option, that coercion, and that ToNumber check.
+   */
   pixelate?: number;
+  /**
+   * Downscale and upscale settings. Wins over `pixelate` when both are set.
+   * `blockSize` must be a finite number `>= 2` (not coerced from a string).
+   * Omitted stages use smooth defaults. `{ blockSize: 8 }` matches `pixelate: 8`
+   * on an even split. `quality` has no effect while that stage's smoothing is off.
+   */
+  pixelation?: PixelationOptions;
   /** Font stack used when `source` is `"native"`. */
   fontFamily?: string;
   responsive?: ResponsiveImage;

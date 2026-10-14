@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, test, vi } from "vite-plus/test";
-import { InvalidEmojiError, RasterizeError } from "../src/errors.ts";
+import { IncompatibleOptionsError, InvalidEmojiError, RasterizeError } from "../src/errors.ts";
+import { resetPixelateDeprecationForTests } from "../src/pixelation.ts";
 import {
   nativeEmojiToDataUrl,
   nativeEmojiToHtmlImage,
   nativeEmojiToImageBlob,
 } from "../src/nativeToImage.ts";
-import { mockCanvas } from "./helpers.ts";
+import { installTrackedCanvases, mockCanvas } from "./helpers.ts";
 
 function mock2dContext(
   overrides: Partial<CanvasRenderingContext2D> = {},
@@ -103,5 +104,40 @@ describe("nativeToImage", () => {
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
 
     await expect(nativeEmojiToImageBlob({ emoji: "🎉" })).rejects.toBeInstanceOf(RasterizeError);
+  });
+
+  test("does not fill the text canvas when pixelate or pixelation is active", async () => {
+    resetPixelateDeprecationForTests();
+    const tracked = installTrackedCanvases();
+    restoreOffscreenCanvas = tracked.restore;
+
+    await nativeEmojiToImageBlob({
+      emoji: "🎉",
+      size: 32,
+      pixelate: 8,
+      background: "#fff",
+    });
+    await nativeEmojiToImageBlob({
+      emoji: "🎉",
+      size: 32,
+      pixelation: { blockSize: 8 },
+      background: "#fff",
+    });
+
+    for (const offset of [0, 3]) {
+      const text = tracked.canvases[offset];
+      const output = tracked.canvases[offset + 1];
+      const scratch = tracked.canvases[offset + 2];
+      expect(text?.context.fillRect).not.toHaveBeenCalled();
+      expect(text?.context.fillText).toHaveBeenCalled();
+      expect(output?.context.fills).toEqual([{ style: "#fff", width: 32, height: 32 }]);
+      expect(scratch?.context.fills).toEqual([{ style: "#fff", width: 4, height: 4 }]);
+    }
+  });
+
+  test("throws IncompatibleOptionsError for an invalid pixelation blockSize", async () => {
+    await expect(
+      nativeEmojiToImageBlob({ emoji: "🎉", pixelation: { blockSize: Number.NaN } }),
+    ).rejects.toBeInstanceOf(IncompatibleOptionsError);
   });
 });

@@ -1,17 +1,33 @@
 import { IncompatibleOptionsError } from "./errors.ts";
 import { fetchSvgText } from "./fetchSvg.ts";
 import { normalizeSvg } from "./normalizeSvg.ts";
+import { coercePixelation } from "./pixelation.ts";
 import { resolveResponsiveSvg } from "./responsive.ts";
 import { svgToDataUrl } from "./svgToImage.ts";
 import type { EmojiToSvgOptions } from "./types.ts";
 import { wrapRasterSvg } from "./wrapRasterSvg.ts";
 
-export async function emojiToSvg(emoji: string, options: EmojiToSvgOptions = {}): Promise<string> {
-  const { size = 72, xmlDeclaration, pixelate, responsive, ...fetchOptions } = options;
+const PIXELATE_RESPONSIVE_MESSAGE =
+  "responsive is incompatible with pixelate on emojiToSvg because pixelated output embeds a raster image";
+const PIXELATION_RESPONSIVE_MESSAGE =
+  "responsive is incompatible with pixelation on emojiToSvg because pixelated output embeds a raster image";
 
-  if (pixelate !== undefined && pixelate >= 2 && resolveResponsiveSvg(responsive) !== null) {
+export async function emojiToSvg(emoji: string, options: EmojiToSvgOptions = {}): Promise<string> {
+  const {
+    size = 72,
+    xmlDeclaration,
+    pixelate,
+    pixelation: pixelationOption,
+    responsive,
+    ...fetchOptions
+  } = options;
+  // Coerce before the responsive check. v2 removes `pixelate: number`; pass
+  // only the object downstream so svg rasterization does not coerce again.
+  const pixelation = coercePixelation({ pixelate, pixelation: pixelationOption });
+
+  if (pixelation !== null && resolveResponsiveSvg(responsive) !== null) {
     throw new IncompatibleOptionsError(
-      "responsive is incompatible with pixelate on emojiToSvg because pixelated output embeds a raster image",
+      pixelationOption !== undefined ? PIXELATION_RESPONSIVE_MESSAGE : PIXELATE_RESPONSIVE_MESSAGE,
     );
   }
 
@@ -21,14 +37,14 @@ export async function emojiToSvg(emoji: string, options: EmojiToSvgOptions = {})
     svg,
     size,
     responsive,
-    xmlDeclaration: pixelate && pixelate >= 2 ? false : xmlDeclaration,
+    xmlDeclaration: pixelation !== null ? false : xmlDeclaration,
   });
 
-  if (pixelate !== undefined && pixelate >= 2) {
+  if (pixelation !== null) {
     const dataUrl = await svgToDataUrl({
       svg: normalized,
       size,
-      pixelate,
+      pixelation,
     });
 
     return wrapRasterSvg({
@@ -50,6 +66,13 @@ export type {
   ResponsiveSvg,
   ResponsiveSvgOptions,
 } from "./types.ts";
+export type {
+  PixelationDownscaleOptions,
+  PixelationOptions,
+  PixelationRounding,
+  PixelationScaleOptions,
+  PixelationSmoothingQuality,
+} from "./pixelation.ts";
 export {
   InvalidEmojiError,
   EmojiNotFoundError,

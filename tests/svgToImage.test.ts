@@ -4,9 +4,14 @@ import {
   resetNodeCanvasModuleForTests,
   setNodeCanvasLoaderForTests,
 } from "../src/canvasEnv.ts";
-import { RasterizeError } from "../src/errors.ts";
+import { IncompatibleOptionsError, RasterizeError } from "../src/errors.ts";
+import {
+  PIXELATE_DEPRECATION_WARNING,
+  nearestPixelation,
+  resetPixelateDeprecationForTests,
+} from "../src/pixelation.ts";
 import { svgToDataUrl, svgToHtmlImage, svgToImageBlob } from "../src/svgToImage.ts";
-import { mockCanvas, SAMPLE_SVG } from "./helpers.ts";
+import { installTrackedCanvases, mockCanvas, SAMPLE_SVG } from "./helpers.ts";
 
 describe("svgToImage", () => {
   let restoreOffscreenCanvas: (() => void) | undefined;
@@ -30,6 +35,8 @@ describe("svgToImage", () => {
   });
 
   test("pixelates output with nearest-neighbor scaling", async () => {
+    resetPixelateDeprecationForTests();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     restoreOffscreenCanvas = mockCanvas();
     const drawImage = vi.fn();
     const context = {
@@ -49,6 +56,23 @@ describe("svgToImage", () => {
 
     expect(drawImage).toHaveBeenCalledTimes(2);
     expect(context.imageSmoothingEnabled).toBe(true);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(PIXELATE_DEPRECATION_WARNING);
+
+    await svgToImageBlob({
+      svg: SAMPLE_SVG,
+      size: 32,
+      pixelate: 8,
+    });
+    expect(warn).toHaveBeenCalledTimes(1);
+
+    resetPixelateDeprecationForTests();
+    await svgToImageBlob({
+      svg: SAMPLE_SVG,
+      size: 32,
+      pixelate: 8,
+    });
+    expect(warn).toHaveBeenCalledTimes(2);
   });
 
   test("fills the canvas background when provided", async () => {
@@ -265,5 +289,181 @@ describe("svgToImage", () => {
         svg: SAMPLE_SVG,
       }),
     ).rejects.toThrow("Failed to read blob as data URL");
+  });
+
+  test("pixelate below 2 does not warn or create a scratch canvas", async () => {
+    resetPixelateDeprecationForTests();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const tracked = installTrackedCanvases();
+    restoreOffscreenCanvas = tracked.restore;
+
+    await svgToImageBlob({ svg: SAMPLE_SVG, size: 32, pixelate: 0 });
+    await svgToImageBlob({ svg: SAMPLE_SVG, size: 32, pixelate: 1 });
+
+    expect(warn).not.toHaveBeenCalled();
+    expect(tracked.canvases.map((canvas) => canvas.width)).toEqual([32, 32]);
+    expect(tracked.canvases[0]?.context.imageSmoothingEnabled).toBe(false);
+    expect(tracked.canvases[0]?.context.imageSmoothingQuality).toBe("high");
+  });
+
+  test("pixelate 8 uses a floor cell grid and restores output smoothing", async () => {
+    resetPixelateDeprecationForTests();
+    const tracked = installTrackedCanvases();
+    restoreOffscreenCanvas = tracked.restore;
+
+    await svgToImageBlob({ svg: SAMPLE_SVG, size: 32, pixelate: 8 });
+
+    const output = tracked.canvases[0];
+    const scratch = tracked.canvases[1];
+    expect(output?.width).toBe(32);
+    expect(scratch?.width).toBe(4);
+    expect(scratch?.context.smoothingAtDraw).toEqual([true]);
+    expect(scratch?.context.qualityAtDraw).toEqual(["low"]);
+    expect(output?.context.smoothingAtDraw).toEqual([false]);
+    expect(output?.context.qualityAtDraw).toEqual(["low"]);
+    expect(output?.context.imageSmoothingEnabled).toBe(true);
+    expect(output?.context.imageSmoothingQuality).toBe("low");
+    expect(scratch?.context.drawImage).toHaveBeenCalledWith(expect.anything(), 0, 0, 4, 4);
+    expect(output?.context.drawImage).toHaveBeenCalledWith(
+      expect.anything(),
+      0,
+      0,
+      4,
+      4,
+      0,
+      0,
+      32,
+      32,
+    );
+  });
+
+  test("blockSize 8 matches pixelate 8 and does not warn", async () => {
+    resetPixelateDeprecationForTests();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const tracked = installTrackedCanvases();
+    restoreOffscreenCanvas = tracked.restore;
+
+    await svgToImageBlob({ svg: SAMPLE_SVG, size: 32, pixelation: { blockSize: 8 } });
+
+    expect(warn).not.toHaveBeenCalled();
+    expect(tracked.canvases[1]?.width).toBe(4);
+    expect(tracked.canvases[1]?.context.smoothingAtDraw).toEqual([true]);
+    expect(tracked.canvases[0]?.context.smoothingAtDraw).toEqual([false]);
+    expect(tracked.canvases[0]?.context.imageSmoothingEnabled).toBe(true);
+  });
+
+  test("pixelation wins over pixelate and still warns", async () => {
+    resetPixelateDeprecationForTests();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const tracked = installTrackedCanvases();
+    restoreOffscreenCanvas = tracked.restore;
+
+    await svgToImageBlob({
+      svg: SAMPLE_SVG,
+      size: 32,
+      pixelate: 4,
+      pixelation: { blockSize: 8 },
+    });
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(PIXELATE_DEPRECATION_WARNING);
+    expect(tracked.canvases[1]?.width).toBe(4);
+  });
+
+  test("nearestPixelation disables smoothing on both draws", async () => {
+    const tracked = installTrackedCanvases();
+    restoreOffscreenCanvas = tracked.restore;
+
+    await svgToImageBlob({
+      svg: SAMPLE_SVG,
+      size: 32,
+      pixelation: nearestPixelation,
+    });
+
+    expect(tracked.canvases[1]?.context.smoothingAtDraw).toEqual([false]);
+    expect(tracked.canvases[0]?.context.smoothingAtDraw).toEqual([false]);
+    expect(tracked.canvases[1]?.width).toBe(4);
+  });
+
+  test("rounds or floors the cell count from block size", async () => {
+    const rounded = installTrackedCanvases();
+    restoreOffscreenCanvas = rounded.restore;
+
+    await svgToImageBlob({
+      svg: SAMPLE_SVG,
+      size: 100,
+      pixelation: { ...nearestPixelation, blockSize: 6 },
+    });
+    expect(rounded.canvases[1]?.width).toBe(17);
+
+    rounded.restore();
+    vi.restoreAllMocks();
+
+    const floored = installTrackedCanvases();
+    restoreOffscreenCanvas = floored.restore;
+    await svgToImageBlob({
+      svg: SAMPLE_SVG,
+      size: 100,
+      pixelation: { blockSize: 6, downscale: { rounding: "floor" } },
+    });
+    expect(floored.canvases[1]?.width).toBe(16);
+  });
+
+  test("top-level background fills both pixelation stages", async () => {
+    const tracked = installTrackedCanvases();
+    restoreOffscreenCanvas = tracked.restore;
+
+    await svgToImageBlob({
+      svg: SAMPLE_SVG,
+      size: 32,
+      background: "#fff",
+      pixelate: 8,
+    });
+    await svgToImageBlob({
+      svg: SAMPLE_SVG,
+      size: 32,
+      background: "#fff",
+      pixelation: { blockSize: 8 },
+    });
+
+    for (const offset of [0, 2]) {
+      expect(tracked.canvases[offset]?.context.fills).toEqual([
+        { style: "#fff", width: 32, height: 32 },
+      ]);
+      expect(tracked.canvases[offset + 1]?.context.fills).toEqual([
+        { style: "#fff", width: 4, height: 4 },
+      ]);
+    }
+  });
+
+  test("explicit null downscale background fills only the output", async () => {
+    const tracked = installTrackedCanvases();
+    restoreOffscreenCanvas = tracked.restore;
+
+    await svgToImageBlob({
+      svg: SAMPLE_SVG,
+      size: 32,
+      background: "#fff",
+      pixelation: {
+        blockSize: 8,
+        downscale: { background: null },
+        upscale: { background: "#fff" },
+      },
+    });
+
+    expect(tracked.canvases[1]?.context.fills).toEqual([]);
+    expect(tracked.canvases[0]?.context.fills).toEqual([{ style: "#fff", width: 32, height: 32 }]);
+  });
+
+  test("throws IncompatibleOptionsError for blockSize below 2", async () => {
+    await expect(
+      svgToImageBlob({ svg: SAMPLE_SVG, pixelation: { blockSize: 1 } }),
+    ).rejects.toBeInstanceOf(IncompatibleOptionsError);
+
+    const tracked = installTrackedCanvases();
+    restoreOffscreenCanvas = tracked.restore;
+    await expect(
+      svgToImageBlob({ svg: SAMPLE_SVG, size: 32, pixelate: 1 }),
+    ).resolves.toBeInstanceOf(Blob);
   });
 });

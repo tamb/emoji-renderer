@@ -6,7 +6,7 @@ todos:
     content: Add src/pixelation.ts with the public types, smooth and nearest presets, coercePixelation, and a once-only pixelate deprecation warning.
     status: pending
   - id: keep-pixelate
-    content: Keep pixelate on the public options and thread both pixelate and pixelation through emojiToImage, emojiToSvg, svgToImage, and nativeToImage.
+    content: Keep pixelate on the public options, thread both pixelate and pixelation through emojiToImage, emojiToSvg, svgToImage, and nativeToImage, and leave a v2 comment on each pixelate option and coercion.
     status: pending
   - id: draw-pipeline
     content: Apply per-stage smoothing, quality, rounding, and background in drawImageToContext, and keep the native text canvas transparent while pixelating.
@@ -24,11 +24,22 @@ isProject: false
 
 This is additive. Keep `pixelate?: number` on the public options, with the same pixels as today. Add `pixelation?: PixelationOptions` beside it.
 
+Leave a source comment on every `pixelate` option and every coercion that exists only to accept it. Grep `v2: remove` to find them. v2 deletes those options, the coercion, the deprecation warning, and the tests and docs that exist for them. `pixelation`, the presets, and `resolvePixelation` stay.
+
 `pixelation` is one object: a block size, plus a downscale stage and an upscale stage. Each stage has its own smoothing, quality, and background. Rounding belongs on the downscale stage, because that stage chooses the cell grid. There is no `algorithm` field. The presets are the two algorithms.
 
 ## Public types
 
 Leave `pixelate?: number` in place on `EmojiToSvgOptions`, `EmojiToImageOptions`, `SvgToImageOptions`, and `NativeToImageOptions`. Mark it `@deprecated` and point the JSDoc at `pixelation`. Values below 2 still mean "off" and do not warn. Values `>= 2` still mean a block size of that many output pixels.
+
+```ts
+/**
+ * Block size in output pixels. Values >= 2 pixelate.
+ * @deprecated Use `pixelation`.
+ * v2: remove this pixelate option.
+ */
+pixelate?: number;
+```
 
 Add [`src/pixelation.ts`](src/pixelation.ts):
 
@@ -97,20 +108,29 @@ Export the types and the three values from [`src/index.ts`](src/index.ts). Re-ex
 
 Add `coercePixelation({ pixelate, pixelation })` in `src/pixelation.ts`. Public entry points call it once and pass the result downstream. Downstream drawing takes `PixelationOptions | undefined` only, so the warning cannot fire twice for one call.
 
-- Neither option: return `null`. Draw at full resolution, unchanged.
-- `pixelate` below 2, and no `pixelation`: return `null`. No warning.
-- `pixelate >= 2`, and no `pixelation`: warn, then return `{ blockSize: pixelate }`. That uses the smooth defaults, which is today's behavior.
-- `pixelation` set, with or without `pixelate`: use `pixelation` as given. Do not merge `pixelate` into `blockSize` or the stages. If `pixelate >= 2` as well, still warn.
+```ts
+// v2: remove the pixelate parameter, this coercion, the deprecation warning, and resetPixelateDeprecationForTests.
+// Keep blockSize validation for pixelation.
+export function coercePixelation(options: {
+  pixelate?: number;
+  pixelation?: PixelationOptions;
+}): PixelationOptions | null;
+```
 
-Warn with `console.warn`, once per process:
+- Neither option: return `null`. Draw at full resolution, unchanged.
+- `pixelate` below 2, and no `pixelation`: return `null`. No warning. `// v2: remove this pixelate coercion.`
+- `pixelate >= 2`, and no `pixelation`: warn, then return `{ blockSize: pixelate }`. That uses the smooth defaults, which is today's behavior. `// v2: remove this pixelate coercion.`
+- `pixelation` set, with or without `pixelate`: use `pixelation` as given. Do not merge `pixelate` into `blockSize` or the stages. If `pixelate >= 2` as well, still warn. `// v2: remove the pixelate branch of this coercion.` The `pixelation` branch stays.
+
+Warn with `console.warn`, once per process. `// v2: remove this deprecation warning.`
 
 ```txt
 pixelate is deprecated and will be removed in a future major version. Use pixelation: { blockSize: N } or smoothPixelation instead.
 ```
 
-Do not throw. A thrown error would break current callers. Use a module-level flag so srcset widths and repeated renders warn once. Export `resetPixelateDeprecationForTests()` next to the other test resetters, and call it from tests that assert the warning.
+Do not throw. A thrown error would break current callers. Use a module-level flag so srcset widths and repeated renders warn once. Export `resetPixelateDeprecationForTests()` next to the other test resetters, and call it from tests that assert the warning. `// v2: remove resetPixelateDeprecationForTests and the once-only flag.`
 
-`pixelation.blockSize` must be a finite number `>= 2`. Otherwise throw `IncompatibleOptionsError`. That check applies only to the new object. `pixelate: 0` and `pixelate: 1` stay silent no-ops.
+`pixelation.blockSize` must be a finite number `>= 2`. Otherwise throw `IncompatibleOptionsError`. That check applies only to the new object and stays in v2. `pixelate: 0` and `pixelate: 1` stay silent no-ops. `// v2: remove this pixelate no-op.`
 
 ## Resolution rules
 
@@ -134,7 +154,7 @@ flowchart LR
 
 ## Call sites
 
-Keep `pixelate` and add `pixelation` on:
+Keep `pixelate` and add `pixelation` on the option interfaces below. `// v2: remove the pixelate option from each of these interfaces.`
 
 - [`src/types.ts`](src/types.ts) (`EmojiToSvgOptions`, `EmojiToImageOptions`)
 - [`src/svgToImage.ts`](src/svgToImage.ts) (`SvgToImageOptions`)
@@ -142,7 +162,7 @@ Keep `pixelate` and add `pixelation` on:
 - [`src/emojiToImage.ts`](src/emojiToImage.ts), including `RenderEmojiBlobOptions` and every place that forwards pixelation into the blob, srcset, native, and SVG raster paths
 - [`src/emojiToSvg.ts`](src/emojiToSvg.ts)
 
-Coerce at `emojiToImage`, `emojiToSvg`, `svgToImageBlob`, and `nativeEmojiToImageBlob`. After that, forward only the resolved `PixelationOptions | undefined`. `emojiToImage` currently rasterizes SVG without passing `pixelate` into `emojiToSvg`, then pixelates in `svgToImageBlob`. Keep that split: coerce in `emojiToImage` and pass `pixelation` into `svgToImageBlob`, so a `pixelate` number on `emojiToImage` does not go through `emojiToSvg`.
+Coerce at `emojiToImage`, `emojiToSvg`, `svgToImageBlob`, and `nativeEmojiToImageBlob`. `// v2: remove the pixelate argument from these calls. Pass pixelation through.` After that, forward only the resolved `PixelationOptions | undefined`. `emojiToImage` currently rasterizes SVG without passing `pixelate` into `emojiToSvg`, then pixelates in `svgToImageBlob`. Keep that split: coerce in `emojiToImage` and pass `pixelation` into `svgToImageBlob`, so a `pixelate` number on `emojiToImage` does not go through `emojiToSvg`. This split stays in v2. `emojiToImage` still must not send `pixelation` into `emojiToSvg`, or the SVG wrapper would be pixelated and then pixelated again.
 
 `drawImageToContext(context, image, size, background, pixelation?)` keeps `background` as the fallback color and passes it into `resolvePixelation`.
 
@@ -158,15 +178,15 @@ Pixelated drawing:
 
 Add `imageSmoothingQuality` to the local `DrawableContext` in [`src/svgToImage.ts`](src/svgToImage.ts) and to `MinimalCanvasContext2D` in [`src/canvasEnv.ts`](src/canvasEnv.ts).
 
-Native text, in [`src/nativeToImage.ts`](src/nativeToImage.ts): when coercion returns a pixelation object (from `pixelate >= 2` or from `pixelation`), render the glyph canvas with no background, then let `drawImageToContext` apply the stage backgrounds. When coercion returns null, keep filling the top-level background on the text canvas.
+Native text, in [`src/nativeToImage.ts`](src/nativeToImage.ts): when coercion returns a pixelation object (from `pixelate >= 2` or from `pixelation`), render the glyph canvas with no background, then let `drawImageToContext` apply the stage backgrounds. When coercion returns null, keep filling the top-level background on the text canvas. `// v2: remove the pixelate >= 2 branch of this check.`
 
-`emojiToSvg`: coerce before the responsive check. `responsive` together with an active pixelation (either `pixelate >= 2` or a `pixelation` object) still throws `IncompatibleOptionsError`. Keep the existing message for `pixelate`, and use `responsive is incompatible with pixelation on emojiToSvg because pixelated output embeds a raster image` when the object is set. An active pixelation still forces `xmlDeclaration: false` on the inner normalized SVG, rasterizes through `svgToDataUrl`, and wraps the PNG with `wrapRasterSvg`.
+`emojiToSvg`: coerce before the responsive check. `responsive` together with an active pixelation (either `pixelate >= 2` or a `pixelation` object) still throws `IncompatibleOptionsError`. Keep the existing message for `pixelate`, and use `responsive is incompatible with pixelation on emojiToSvg because pixelated output embeds a raster image` when the object is set. `// v2: remove the pixelate >= 2 check and its error message.` An active result still forces `xmlDeclaration: false` on the inner normalized SVG, rasterizes through `svgToDataUrl`, and wraps the PNG with `wrapRasterSvg`. `// v2: remove the pixelate >= 2 condition on xmlDeclaration. A pixelation object still forces it false.`
 
-Srcset and responsive image rendering pass the coerced object through at every physical width. Block size stays constant while the cell count follows each render size. Coerce once before the srcset loop so the deprecation warning is not repeated per width.
+Srcset and responsive image rendering pass the coerced object through at every physical width. Block size stays constant while the cell count follows each render size. Coerce once before the srcset loop so the deprecation warning is not repeated per width. `// v2: remove this once-only coercion; pass pixelation through the loop.`
 
 ## Tests
 
-Leave the existing `pixelate: 8` tests in place. They must keep producing the same draw sizes and the same final `imageSmoothingEnabled: true`. Add an assertion in one of them that `console.warn` is called once with the deprecation message, and is not called again on a second `pixelate: 8` render until `resetPixelateDeprecationForTests()`.
+Leave the existing `pixelate: 8` tests in place. They must keep producing the same draw sizes and the same final `imageSmoothingEnabled: true`. `// v2: remove these pixelate tests.` Add an assertion in one of them that `console.warn` is called once with the deprecation message, and is not called again on a second `pixelate: 8` render until `resetPixelateDeprecationForTests()`. `// v2: remove this deprecation test and the reset helper.`
 
 Give new pixelation tests their own 2D context per canvas. The current shared `getContext` mock cannot tell downscale flags from upscale flags. Context order:
 
@@ -175,24 +195,25 @@ Give new pixelation tests their own 2D context per canvas. The current shared `g
 
 Assert:
 
-- `pixelate: 8` on size 32 still uses scratch size `Math.floor(32 / 8) === 4`, scratch smoothing on, output smoothing off during the enlarge, then restored to `true`.
-- `pixelate: 0` and `pixelate: 1` do not warn and do not create a scratch canvas.
-- `{ pixelation: { blockSize: 8 } }` matches that `pixelate: 8` draw and does not warn.
-- `pixelation` together with `pixelate: 4` follows `pixelation` and still warns.
+- `pixelate: 8` on size 32 still uses scratch size `Math.floor(32 / 8) === 4`, scratch smoothing on, output smoothing off during the enlarge, then restored to `true`. `// v2: remove this pixelate assertion.`
+- `pixelate: 0` and `pixelate: 1` do not warn and do not create a scratch canvas. `// v2: remove this pixelate assertion.`
+- `{ pixelation: { blockSize: 8 } }` matches that `pixelate: 8` draw and does not warn. `// v2: remove the does-not-warn clause. Keep the draw match.`
+- `pixelation` together with `pixelate: 4` follows `pixelation` and still warns. `// v2: remove this pixelate assertion.`
 - `nearestPixelation` with `blockSize: 8` turns smoothing off on both draws. Size 100 and block 6 uses `Math.round(100 / 6) === 17` cells. The same size with `rounding: "floor"` uses 16.
-- Top-level `background: "#fff"` fills both the scratch canvas and the output canvas for both `pixelate: 8` and `{ blockSize: 8 }`.
+- Top-level `background: "#fff"` fills both the scratch canvas and the output canvas for both `pixelate: 8` and `{ blockSize: 8 }`. `// v2: remove the pixelate: 8 half of this assertion.`
 - `downscale: { background: null }` with `upscale: { background: "#fff" }` fills only the output, at full size.
-- `pixelation: { blockSize: 1 }` throws `IncompatibleOptionsError` from `emojiToImage`, `emojiToSvg`, and `svgToImage`. `pixelate: 1` does not throw.
-- `emojiToSvg` with `responsive: true` and `pixelate: 8` still throws. The same call with `pixelation: { blockSize: 8 }` throws. `pixelate: 1` with `responsive: true` does not throw.
+- `pixelation: { blockSize: 1 }` throws `IncompatibleOptionsError` from `emojiToImage`, `emojiToSvg`, and `svgToImage`. `pixelate: 1` does not throw. `// v2: remove the pixelate: 1 assertion.`
+- `emojiToSvg` with `responsive: true` and `pixelate: 8` still throws. The same call with `pixelation: { blockSize: 8 }` throws. `pixelate: 1` with `responsive: true` does not throw. `// v2: remove the pixelate assertions.`
 - `emojiToSvg` with `pixelation: smoothPixelation` returns a raster-backed SVG.
-- Native pixelation, whether from `pixelate: 8` or from a `pixelation` object, does not fill the text canvas when a top-level background is set. The stage canvases receive the fill.
-- [`e2e/emojiToImage.browser.test.ts`](e2e/emojiToImage.browser.test.ts) keeps `pixelate: 8` and still expects a different image from the sharp render.
+- Native pixelation, whether from `pixelate: 8` or from a `pixelation` object, does not fill the text canvas when a top-level background is set. The stage canvases receive the fill. `// v2: remove the pixelate: 8 case.`
+- [`e2e/emojiToImage.browser.test.ts`](e2e/emojiToImage.browser.test.ts) keeps `pixelate: 8` and still expects a different image from the sharp render. `// v2: remove this pixelate call and switch the test to pixelation.`
+- [`tests/node/published-package.test.ts`](tests/node/published-package.test.ts) keeps `pixelate: 10` in the consumer script. `// v2: remove this pixelate option from the consumer script and pass pixelation instead.`
 
-Add direct coercion and `resolvePixelation` tests for omitted input (`null`), default stage values, explicit `null` background versus fallback, and non-finite `blockSize`.
+Add direct coercion and `resolvePixelation` tests for omitted input (`null`), default stage values, explicit `null` background versus fallback, and non-finite `blockSize`. `// v2: remove the coercePixelation tests that pass pixelate. Keep the resolvePixelation tests.`
 
 ## Docs and Storybook
 
-In [`README.md`](README.md), keep the `pixelate` row and mark it deprecated. Add a `pixelation` row. Keep a `pixelate: 8` example so the old call still appears, and add:
+In [`README.md`](README.md), keep the `pixelate` row and mark it deprecated. `// v2: remove this pixelate option row.` Add a `pixelation` row. Keep both `pixelate: 8` call examples, the `responsive` incompatibility sentence, and the `IncompatibleOptionsError` table example that names `pixelate`. `// v2: remove those pixelate examples and mentions.` Add:
 
 ```ts
 import { emojiToImage, emojiToSvg, nearestPixelation, pixelationPresets } from "emoji-renderer";
@@ -210,8 +231,8 @@ await emojiToImage("👾", {
 });
 ```
 
-Document the stage fields, the `{ blockSize: 8 }` default, that `quality` has no effect while smoothing is off, and that `pixelation` wins when both options are set.
+Document the stage fields, the `{ blockSize: 8 }` default, that `quality` has no effect while smoothing is off, and that `pixelation` wins when both options are set. `// v2: remove the sentence that says pixelation wins over pixelate.`
 
-In [`src/emojiToImage.stories.ts`](src/emojiToImage.stories.ts) and [`src/emojiToSvg.stories.ts`](src/emojiToSvg.stories.ts), keep the numeric `pixelate` control. Add a preset select (`off`, `smooth`, `nearest`) and a `blockSize` number that build `pixelation` by spreading the chosen preset and overriding `blockSize`. When the select is `off`, omit `pixelation` and leave `pixelate` in charge. Add one story that passes a custom downscale or upscale override (smoothing, quality, or a stage background of `null`) so the stage fields are visible in the docs source.
+In [`src/emojiToImage.stories.ts`](src/emojiToImage.stories.ts) and [`src/emojiToSvg.stories.ts`](src/emojiToSvg.stories.ts), keep the numeric `pixelate` control, the docs-table row, and the source samples that pass `pixelate`. `// v2: remove this pixelate control, the docs-table row, and those samples.` Add a preset select (`off`, `smooth`, `nearest`) and a `blockSize` number that build `pixelation` by spreading the chosen preset and overriding `blockSize`. When the select is `off`, omit `pixelation` and leave `pixelate` in charge. The story render keeps `pixelate: args.pixelate >= 2 ? args.pixelate : undefined`. `// v2: remove that pixelate coercion and the off-state fallback that leaves pixelate in charge.` Add one story that passes a custom downscale or upscale override (smoothing, quality, or a stage background of `null`) so the stage fields are visible in the docs source.
 
 Run `vp check` and `vp test`.

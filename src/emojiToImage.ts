@@ -2,6 +2,8 @@ import { IncompatibleOptionsError, RasterizeError } from "./errors.ts";
 import { shouldTryNextSource } from "./fallback.ts";
 import { nativeEmojiToImageBlob } from "./nativeToImage.ts";
 import { emojiToSvg } from "./emojiToSvg.ts";
+import { coercePixelation } from "./pixelation.ts";
+import type { PixelationOptions } from "./pixelation.ts";
 import {
   applyImageDisplay,
   normalizeSrcSetWidths,
@@ -24,7 +26,7 @@ interface RenderEmojiBlobOptions {
   renderSize: number;
   mimeType: "image/png" | "image/webp";
   background: string | null;
-  pixelate?: number;
+  pixelation?: PixelationOptions;
   source: EmojiImageSource;
   fallbacks?: EmojiToImageOptions["fallbacks"];
   fallbackToNative?: boolean;
@@ -48,7 +50,7 @@ async function renderEmojiBlob(options: RenderEmojiBlobOptions): Promise<Blob> {
     renderSize,
     mimeType,
     background,
-    pixelate,
+    pixelation,
     source,
     fallbacks,
     fallbackToNative = false,
@@ -64,7 +66,7 @@ async function renderEmojiBlob(options: RenderEmojiBlobOptions): Promise<Blob> {
       size: renderSize,
       mimeType,
       background,
-      pixelate,
+      pixelation,
       fontFamily,
     });
   }
@@ -84,7 +86,7 @@ async function renderEmojiBlob(options: RenderEmojiBlobOptions): Promise<Blob> {
       size: renderSize,
       mimeType,
       background,
-      pixelate,
+      pixelation,
     });
   } catch (error) {
     if (fallbackToNative && shouldTryNextSource(error)) {
@@ -93,7 +95,7 @@ async function renderEmojiBlob(options: RenderEmojiBlobOptions): Promise<Blob> {
         size: renderSize,
         mimeType,
         background,
-        pixelate,
+        pixelation,
         fontFamily,
       });
     }
@@ -124,12 +126,12 @@ async function blobToHtmlImage(blob: Blob, renderSize: number): Promise<HTMLImag
 async function renderEmojiImageElement(
   emoji: string,
   logicalSize: number,
-  options: EmojiToImageOptions,
+  options: Omit<EmojiToImageOptions, "pixelate"> & { pixelation?: PixelationOptions },
 ): Promise<HTMLImageElement> {
   const {
     mimeType = "image/png",
     background = null,
-    pixelate,
+    pixelation,
     source = DEFAULT_IMAGE_SOURCE,
     fallbacks,
     fallbackToNative,
@@ -157,7 +159,7 @@ async function renderEmojiImageElement(
         renderSize,
         mimeType,
         background,
-        pixelate,
+        pixelation,
         source,
         fallbacks,
         fallbackToNative,
@@ -194,7 +196,7 @@ async function renderEmojiImageElement(
     renderSize,
     mimeType,
     background,
-    pixelate,
+    pixelation,
     source,
     fallbacks,
     fallbackToNative,
@@ -218,6 +220,7 @@ export async function emojiToImage<TFormat extends EmojiImageFormat = "image">(
     mimeType = "image/png",
     background = null,
     pixelate,
+    pixelation: pixelationOption,
     size = 72,
     source = DEFAULT_IMAGE_SOURCE,
     fallbacks,
@@ -235,11 +238,15 @@ export async function emojiToImage<TFormat extends EmojiImageFormat = "image">(
     throw new IncompatibleOptionsError('srcSet requires format: "image"');
   }
 
+  // Coerce once, before srcset widths. v2 removes `pixelate: number` and this
+  // number-to-object coercion. Downstream receives only `PixelationOptions`.
+  const pixelation = coercePixelation({ pixelate, pixelation: pixelationOption }) ?? undefined;
+
   if (format === "image") {
     return (await renderEmojiImageElement(emoji, size, {
       mimeType,
       background,
-      pixelate,
+      pixelation,
       source,
       fallbacks,
       fallbackToNative,
@@ -260,7 +267,7 @@ export async function emojiToImage<TFormat extends EmojiImageFormat = "image">(
     renderSize,
     mimeType,
     background,
-    pixelate,
+    pixelation,
     source,
     fallbacks,
     fallbackToNative,
@@ -289,6 +296,13 @@ export type {
   ResponsiveImage,
   ResponsiveImageOptions,
 } from "./types.ts";
+export type {
+  PixelationDownscaleOptions,
+  PixelationOptions,
+  PixelationRounding,
+  PixelationScaleOptions,
+  PixelationSmoothingQuality,
+} from "./pixelation.ts";
 export {
   InvalidEmojiError,
   EmojiNotFoundError,

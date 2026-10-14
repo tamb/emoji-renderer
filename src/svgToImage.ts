@@ -5,7 +5,9 @@ import {
   get2dContext,
   loadImageFromUrl,
 } from "./canvasEnv.ts";
-import { RasterizeError } from "./errors.ts";
+import { IncompatibleOptionsError, RasterizeError } from "./errors.ts";
+import { coercePixelation, resolvePixelation } from "./pixelation.ts";
+import type { PixelationOptions, PixelationRounding } from "./pixelation.ts";
 
 export {
   blobToDataUrl,
@@ -20,8 +22,25 @@ export interface SvgToImageOptions {
   size?: number;
   mimeType?: "image/png" | "image/webp";
   background?: string | null;
-  /** Block size in output pixels. Values >= 2 enable nearest-neighbor upscaling. */
+  /**
+   * @deprecated Removed in v2. Use `pixelation`.
+   *
+   * `pixelate` is a `number`. `pixelation` is a `PixelationOptions` object.
+   * Those are different types and are not merged: when both are set, the object
+   * is used as given and this number is not copied into `blockSize` or either stage.
+   *
+   * Until v2, values `>= 2` are coerced to `{ blockSize: pixelate }` with smooth
+   * defaults (bilinear downscale, nearest upscale, `rounding: "floor"`).
+   * Values below 2 mean off, do not warn, and are not coerced. The `>=` check
+   * uses JavaScript ToNumber, so a numeric string counts as on. v2 removes
+   * this option, that coercion, and that ToNumber check.
+   */
   pixelate?: number;
+  /**
+   * Downscale and upscale settings. Wins over `pixelate` when both are set.
+   * `blockSize` must be a finite number `>= 2` (not coerced from a string).
+   */
+  pixelation?: PixelationOptions;
 }
 
 interface DrawableContext {
@@ -29,6 +48,7 @@ interface DrawableContext {
   fillRect(x: number, y: number, width: number, height: number): void;
   drawImage(image: CanvasImageSource, ...args: number[]): void;
   imageSmoothingEnabled: boolean;
+  imageSmoothingQuality: ImageSmoothingQuality;
 }
 
 function asDrawableContext(context: unknown): DrawableContext {
@@ -45,16 +65,26 @@ function svgMarkupToDataUrl(svg: string): string {
   return `data:image/svg+xml;charset=utf-8,${encoded}`;
 }
 
+function pixelationCellCount(
+  size: number,
+  blockSize: number,
+  rounding: PixelationRounding,
+): number {
+  const scaled = size / blockSize;
+  const cells = rounding === "round" ? Math.round(scaled) : Math.floor(scaled);
+  return Math.max(1, cells);
+}
+
 export async function drawImageToContext(
   context: unknown,
   image: CanvasImageSource,
   size: number,
   background: string | null,
-  pixelate?: number,
+  pixelation?: PixelationOptions,
 ): Promise<void> {
   const ctx = asDrawableContext(context);
-  const blockSize = pixelate ?? 1;
-  if (blockSize < 2) {
+  const resolved = resolvePixelation(pixelation, background);
+  if (resolved === null) {
     if (background !== null) {
       ctx.fillStyle = background;
       ctx.fillRect(0, 0, size, size);
@@ -63,39 +93,53 @@ export async function drawImageToContext(
     return;
   }
 
-  const smallSize = Math.max(1, Math.floor(size / blockSize));
-  const scratch = await createCanvas(smallSize);
+  const cells = pixelationCellCount(size, resolved.blockSize, resolved.downscale.rounding);
+  const scratch = await createCanvas(cells);
   const scratchContext = asDrawableContext(get2dContext(scratch));
 
-  if (background !== null) {
-    scratchContext.fillStyle = background;
-    scratchContext.fillRect(0, 0, smallSize, smallSize);
+  if (resolved.downscale.background !== null) {
+    scratchContext.fillStyle = resolved.downscale.background;
+    scratchContext.fillRect(0, 0, cells, cells);
   }
 
-  scratchContext.drawImage(image, 0, 0, smallSize, smallSize);
+  scratchContext.imageSmoothingEnabled = resolved.downscale.smoothing;
+  scratchContext.imageSmoothingQuality = resolved.downscale.quality;
+  scratchContext.drawImage(image, 0, 0, cells, cells);
 
-  if (background !== null) {
-    ctx.fillStyle = background;
+  if (resolved.upscale.background !== null) {
+    ctx.fillStyle = resolved.upscale.background;
     ctx.fillRect(0, 0, size, size);
   }
 
-  ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(scratch as CanvasImageSource, 0, 0, smallSize, smallSize, 0, 0, size, size);
+  ctx.imageSmoothingEnabled = resolved.upscale.smoothing;
+  ctx.imageSmoothingQuality = resolved.upscale.quality;
+  ctx.drawImage(scratch as CanvasImageSource, 0, 0, cells, cells, 0, 0, size, size);
   ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "low";
 }
 
 export async function svgToImageBlob(options: SvgToImageOptions): Promise<Blob> {
-  const { svg, size = 72, mimeType = "image/png", background = null, pixelate } = options;
+  const {
+    svg,
+    size = 72,
+    mimeType = "image/png",
+    background = null,
+    pixelate,
+    pixelation: pixelationOption,
+  } = options;
+  // Coerce here so direct callers warn once. `emojiToImage` coerces first and
+  // forwards only `pixelation`, so a legacy number is not coerced a second time.
+  const pixelation = coercePixelation({ pixelate, pixelation: pixelationOption }) ?? undefined;
 
   try {
     const image = (await loadImageFromUrl(svgMarkupToDataUrl(svg))) as CanvasImageSource;
     const canvas = await createCanvas(size);
     const context = get2dContext(canvas);
 
-    await drawImageToContext(context, image, size, background, pixelate);
+    await drawImageToContext(context, image, size, background, pixelation);
     return canvasToBlob(canvas, mimeType);
   } catch (error) {
-    if (error instanceof RasterizeError) {
+    if (error instanceof RasterizeError || error instanceof IncompatibleOptionsError) {
       throw error;
     }
     const message = error instanceof Error ? error.message : String(error);

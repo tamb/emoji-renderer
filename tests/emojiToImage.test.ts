@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { emojiToImage } from "../src/emojiToImage.ts";
 import { IncompatibleOptionsError } from "../src/errors.ts";
+import {
+  PIXELATE_DEPRECATION_WARNING,
+  resetPixelateDeprecationForTests,
+} from "../src/pixelation.ts";
 import { sharedSvgCache } from "../src/svgCache.ts";
 import {
   createMockFetch,
@@ -247,6 +251,40 @@ describe("emojiToImage", () => {
     expect(blob).toBeInstanceOf(Blob);
     expect(fillText).toHaveBeenCalledWith("😀", 36, 36);
     expect(fetchImpl).toHaveBeenCalled();
+  });
+
+  test("throws IncompatibleOptionsError for pixelation blockSize below 2", async () => {
+    await expect(
+      emojiToImage("😀", { pixelation: { blockSize: 1 }, fetch: mockTwemojiFetch() }),
+    ).rejects.toBeInstanceOf(IncompatibleOptionsError);
+  });
+
+  test("does not throw when pixelate is below 2", async () => {
+    resetPixelateDeprecationForTests();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    restoreOffscreenCanvas = mockCanvas();
+
+    await expect(
+      emojiToImage("😀", { pixelate: 1, format: "blob", fetch: mockTwemojiFetch() }),
+    ).resolves.toBeInstanceOf(Blob);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  test("warns once when pixelate is used across srcset widths", async () => {
+    resetPixelateDeprecationForTests();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    restoreOffscreenCanvas = mockCanvas();
+    vi.stubGlobal("devicePixelRatio", 1);
+
+    await emojiToImage("😀", {
+      pixelate: 8,
+      srcSet: [24, 48],
+      fetch: mockTwemojiFetch(),
+    });
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(PIXELATE_DEPRECATION_WARNING);
+    vi.unstubAllGlobals();
   });
 
   test("still throws when CDNs fail and fallbackToNative is false", async () => {

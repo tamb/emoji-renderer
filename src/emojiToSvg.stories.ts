@@ -1,6 +1,15 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
 import type { EmojiCdnPreset, EmojiSource } from "./types.ts";
 import { emojiToSvg } from "./emojiToSvg.ts";
+import { nearestPixelation, pixelationPresets } from "./pixelation.ts";
+import type { PixelationOptions } from "./pixelation.ts";
+import {
+  formatPixelationDemo,
+  pixelationDemoArgs,
+  pixelationDemoArgTypes,
+  pixelationFromDemoArgs,
+} from "./pixelationDemo.ts";
+import type { PixelationDemoArgs } from "./pixelationDemo.ts";
 import { isEmojiCdnPreset } from "./sources.ts";
 
 interface EmojiToSvgStoryArgs {
@@ -8,6 +17,8 @@ interface EmojiToSvgStoryArgs {
   size: number;
   xmlDeclaration: boolean;
   pixelate: number;
+  pixelationPreset: "off" | "smooth" | "nearest";
+  pixelationBlockSize: number;
   cache: boolean;
   sourceMode: "twemoji" | "openmoji" | "noto" | "fluent" | "custom";
   fluentStyle: "color" | "flat" | "high-contrast" | "3d";
@@ -26,6 +37,8 @@ const meta = {
     size: 72,
     xmlDeclaration: false,
     pixelate: 0,
+    pixelationPreset: "off",
+    pixelationBlockSize: 8,
     cache: true,
     sourceMode: "twemoji",
     fluentStyle: "color",
@@ -51,7 +64,18 @@ const meta = {
     pixelate: {
       control: { type: "number", min: 0, max: 32, step: 1 },
       description:
-        "Block size in output pixels. `>= 2` rasterizes and embeds a pixelated PNG inside the SVG. Incompatible with responsive. Default: off.",
+        "Deprecated and removed in v2. `pixelate` is a number coerced to `{ blockSize }` when `>= 2` (that coercion and its ToNumber check go away in v2). Values below 2 stay off. Incompatible with responsive. A selected pixelation preset wins.",
+    },
+    pixelationPreset: {
+      control: "select",
+      options: ["off", "smooth", "nearest"],
+      description:
+        "Pixelation preset. `off` leaves `pixelate` in charge. `smooth` and `nearest` build a `pixelation` object and override its `blockSize`. Incompatible with responsive.",
+    },
+    pixelationBlockSize: {
+      control: { type: "number", min: 2, max: 32, step: 1 },
+      description:
+        "Finite `blockSize` applied when a pixelation preset is selected. Must be >= 2. Ignored when the preset is off.",
     },
     responsiveMode: {
       control: "select",
@@ -153,11 +177,23 @@ const svg = await emojiToSvg("🌈", {
 });
 \`\`\`
 
-**Pixelated raster embedded in SVG**
+**Pixelated**
+
+Spread a preset, then set \`blockSize\`. \`pixelationPresets.nearest\` is nearest-neighbor on both draws. \`pixelationPresets.smooth\` is the bilinear shrink. The **Pixelated** story uses this call. **Custom pixelation stages** overrides individual stage fields. **All pixelation options** exposes every field. \`emojiToSvg\` has no native source, so this uses the CDN artwork and returns an SVG wrapper around a pixelated PNG. \`responsive\` with pixelation throws \`IncompatibleOptionsError\`.
 
 \`\`\`ts
-const svg = await emojiToSvg("👾", { size: 96, pixelate: 8 });
-// Incompatible with responsive — throws IncompatibleOptionsError
+import { emojiToSvg, pixelationPresets } from "emoji-renderer";
+
+const blockSize = 12;
+
+const svg = await emojiToSvg("🧟", {
+  size: 96,
+  pixelation: {
+    ...pixelationPresets.nearest,
+    blockSize,
+  },
+});
+document.querySelector("#target")!.innerHTML = svg;
 \`\`\`
 
 **OpenMoji / Noto / Fluent presets**
@@ -198,11 +234,105 @@ const svg = await emojiToSvg("😀", {
 | \`source\` | \`"twemoji" \\| "openmoji" \\| "noto" \\| "fluent" \\| { preset: "fluent", style? } \\| { baseUrl, ext?, codePointFormat? }\` | \`"twemoji"\` | CDN preset, Fluent style, or custom asset base |
 | \`fallbacks\` | \`("twemoji" \\| "openmoji" \\| "noto" \\| "fluent")[]\` | none | CDN presets to try after \`source\` fails |
 | \`fetch\` | \`typeof fetch\` | \`globalThis.fetch\` | Custom fetch (not exposed here) |
+| \`timeout\` | \`number\` | \`8000\` | Per-request fetch timeout in milliseconds, composed with \`signal\` (not exposed here) |
+| \`retries\` | \`number\` | \`2\` | Same-source retries for transient failures: network, HTTP 429, 5xx (not exposed here) |
 | \`cache\` | \`boolean\` | \`true\` | Cache fetched SVG text |
 | \`signal\` | \`AbortSignal\` | — | Abort in-flight fetch (not exposed here) |
-| \`xmlDeclaration\` | \`boolean\` | \`false\` | Include \`<?xml ...?>\` prefix |
-| \`pixelate\` | \`number\` | off | Block size in px; \`>= 2\` embeds a pixelated raster in SVG |
-| \`responsive\` | \`boolean \\| { mode, width?, height? }\` | off | CSS-scalable SVG output |
+| \`xmlDeclaration\` | \`boolean\` | \`false\` | Include \`<?xml ...?>\` on the returned markup. Active pixelation still honors this on the wrapper; the inner SVG is written without it |
+| \`pixelate\` | \`number\` | off | Deprecated, removed in v2. A \`number\`, not a \`PixelationOptions\` object. See **PixelationOptions** |
+| \`pixelation\` | \`PixelationOptions\` | off | See **PixelationOptions** below. Used as given when \`pixelate\` is also set. Incompatible with \`responsive\` |
+| \`responsive\` | \`boolean \\| ResponsiveSvgOptions\` | off | CSS-scalable SVG. See **responsive** below. Incompatible with active pixelation |
+
+### \`source\`
+
+| Shape | Fields |
+| --- | --- |
+| \`"twemoji" \\| "openmoji" \\| "noto" \\| "fluent"\` | CDN preset. Default \`"twemoji"\` |
+| \`{ preset: "fluent", style?, baseUrl? }\` | \`style\`: \`"flat" \\| "color" \\| "high-contrast" \\| "3d"\` (default \`"color"\`). \`"3d"\` fetches PNG and wraps it in SVG. \`baseUrl\` overrides the pinned Fluent assets root |
+| \`{ baseUrl, ext?, codePointFormat? }\` | \`ext\` defaults to \`".svg"\`. \`codePointFormat\`: \`"twemoji" \\| "openmoji" \\| "noto"\` (default \`"twemoji"\`) |
+
+\`fallbacks\` accepts the CDN presets only. Duplicates of \`source\` are skipped.
+
+### \`responsive\`
+
+\`ResponsiveSvgOptions\`. \`responsive: true\` is \`{ mode: "intrinsic" }\`.
+
+| Field | Type | Default |
+| --- | --- | --- |
+| \`mode\` | \`"intrinsic" \\| "relative" \\| "fill"\` | \`"intrinsic"\` |
+| \`width\` | \`string\` | omitted |
+| \`height\` | \`string\` | omitted |
+| \`viewBox\` | \`string\` | omitted |
+
+## PixelationOptions
+
+Open **Pixelated** to spread \`pixelationPresets.nearest\` or \`pixelationPresets.smooth\` and set \`blockSize\`. Open **Custom pixelation stages** to override individual stage fields. Open **All pixelation options** to set every field. Each control there is named \`pixelation.blockSize\`, \`pixelation.downscale.[field]\`, or \`pixelation.upscale.[field]\`. Keep \`responsive\` fixed on those stories.
+
+This is the whole object. Comments are the type references. \`emojiToSvg\` has no top-level canvas background, so an omitted stage \`background\` stays transparent.
+
+\`\`\`ts
+import type {
+  PixelationDownscaleOptions,
+  PixelationOptions,
+  PixelationRounding,
+  PixelationScaleOptions,
+  PixelationSmoothingQuality,
+} from "emoji-renderer";
+
+const pixelation = {
+  blockSize: 8, // number — pixelation.blockSize. Finite, >= 2
+  downscale: {
+    smoothing: true, // boolean — pixelation.downscale.smoothing. Default true
+    quality: "low" as PixelationSmoothingQuality, // "low" | "medium" | "high" — pixelation.downscale.quality
+    rounding: "floor" as PixelationRounding, // "floor" | "round" — pixelation.downscale.rounding
+    background: null, // string | null — pixelation.downscale.background
+  } satisfies PixelationDownscaleOptions,
+  upscale: {
+    smoothing: false, // boolean — pixelation.upscale.smoothing. Default false
+    quality: "low" as PixelationSmoothingQuality, // pixelation.upscale.quality
+    background: "#1a1a2e", // string | null — pixelation.upscale.background
+  } satisfies PixelationScaleOptions,
+} satisfies PixelationOptions;
+\`\`\`
+
+\`pixelation.blockSize\` must be a finite \`number\` \`>= 2\`. Any other value throws \`IncompatibleOptionsError\` (\`pixelation.blockSize must be a finite number >= 2\`). \`{ blockSize: 8 }\` with both stages omitted matches \`pixelate: 8\` on an even split: downscale smoothing on, \`quality: "low"\`, \`rounding: "floor"\`; upscale smoothing off, \`quality: "low"\`. Cell count is \`max(1, rounding(size / blockSize))\`, then that canvas is stretched to \`size\`.
+
+\`pixelation.downscale.quality\` and \`pixelation.upscale.quality\` are \`PixelationSmoothingQuality\`. \`"low"\` is bilinear. Canvas ignores \`quality\` while that stage's \`smoothing\` is false, and still stores the value. \`pixelation.downscale.rounding\` is the only \`PixelationRounding\` field.
+
+\`responsive\` with this object throws \`IncompatibleOptionsError\`: \`responsive is incompatible with pixelation on emojiToSvg because pixelated output embeds a raster image\`. The number-only path uses that sentence with \`pixelate\` in place of \`pixelation\`. Active pixelation writes the inner SVG without an XML declaration. The wrapper still uses \`xmlDeclaration\`.
+
+\`pixelate\` is a \`number\` and is removed in v2. It is not copied into \`blockSize\` or either stage. Below 2 it stays off. \`>= 2\` warns once, then becomes \`{ blockSize: pixelate }\` only when \`pixelation\` is omitted. The \`>=\` check uses JavaScript ToNumber. The warning is: \`pixelate is deprecated and will be removed in a future major version. Use pixelation: { blockSize: N } or smoothPixelation instead.\`
+
+\`\`\`ts
+const smoothPixelation = {
+  blockSize: 8,
+  downscale: { smoothing: true, quality: "low", rounding: "floor" },
+  upscale: { smoothing: false, quality: "low" },
+} satisfies PixelationOptions;
+
+const nearestPixelation = {
+  blockSize: 8,
+  downscale: { smoothing: false, quality: "low", rounding: "round" },
+  upscale: { smoothing: false, quality: "low" },
+} satisfies PixelationOptions;
+
+const pixelationPresets = {
+  smooth: smoothPixelation,
+  nearest: nearestPixelation,
+};
+\`\`\`
+
+## Errors
+
+| Error | When |
+| --- | --- |
+| \`InvalidEmojiError\` | Empty or invalid emoji input |
+| \`EmojiNotFoundError\` | Asset missing (HTTP 404/410, unmapped Fluent glyph) |
+| \`EmojiFetchError\` | Transient fetch failure after \`retries\` (network, HTTP 429/5xx, timeout) |
+| \`IncompatibleOptionsError\` | \`responsive\` with \`pixelate >= 2\` or with \`pixelation\`, or \`pixelation.blockSize\` is not a finite number \`>= 2\` |
+| \`RasterizeError\` | Canvas or image rasterization failed while embedding a pixelated PNG |
+
+\`EmojiNotFoundError\` and \`EmojiFetchError\` try \`fallbacks\` when those are set. An aborted \`signal\` does not.
         `,
       },
     },
@@ -248,7 +378,20 @@ function resolveResponsive(args: EmojiToSvgStoryArgs) {
   return undefined;
 }
 
-function renderSvgPreview(args: EmojiToSvgStoryArgs): HTMLDivElement {
+function storyPixelation(args: EmojiToSvgStoryArgs): PixelationOptions | undefined {
+  if (args.pixelationPreset === "smooth" || args.pixelationPreset === "nearest") {
+    return {
+      ...pixelationPresets[args.pixelationPreset],
+      blockSize: args.pixelationBlockSize,
+    };
+  }
+  return undefined;
+}
+
+function renderSvgPreviewWith(
+  args: EmojiToSvgStoryArgs,
+  pixelationOverride?: PixelationOptions,
+): HTMLDivElement {
   const root = document.createElement("div");
   root.style.display = "grid";
   root.style.gap = "12px";
@@ -288,10 +431,26 @@ function renderSvgPreview(args: EmojiToSvgStoryArgs): HTMLDivElement {
 
   root.append(status, preview, source);
 
+  const pixelation = pixelationOverride ?? storyPixelation(args);
+
+  if (pixelationOverride) {
+    root.style.maxWidth = "48rem";
+    const objectView = document.createElement("pre");
+    objectView.style.margin = "0";
+    objectView.style.padding = "12px";
+    objectView.style.borderRadius = "8px";
+    objectView.style.background = "color-mix(in srgb, CanvasText 8%, Canvas)";
+    objectView.style.fontSize = "12px";
+    objectView.style.whiteSpace = "pre-wrap";
+    objectView.textContent = formatPixelationDemo(pixelationOverride);
+    root.append(objectView);
+  }
+
   void emojiToSvg(args.emoji, {
     size: args.size,
     xmlDeclaration: args.xmlDeclaration,
-    pixelate: args.pixelate >= 2 ? args.pixelate : undefined,
+    pixelate: pixelationOverride === undefined && args.pixelate >= 2 ? args.pixelate : undefined,
+    pixelation,
     cache: args.cache,
     source: resolveSource(args),
     fallbacks: parseFallbacks(args.fallbacks),
@@ -309,6 +468,10 @@ function renderSvgPreview(args: EmojiToSvgStoryArgs): HTMLDivElement {
     });
 
   return root;
+}
+
+function renderSvgPreview(args: EmojiToSvgStoryArgs): HTMLDivElement {
+  return renderSvgPreviewWith(args);
 }
 
 export const Default: Story = {
@@ -380,25 +543,106 @@ export const FluentFlat: Story = {
 };
 
 export const Pixelated: Story = {
-  name: "Pixelated raster SVG",
+  name: "Pixelated",
   args: {
-    emoji: "👾",
+    emoji: "🧟",
     size: 96,
-    pixelate: 8,
+    pixelate: 0,
+    pixelationPreset: "nearest",
+    pixelationBlockSize: 12,
+    responsiveMode: "fixed",
   },
   parameters: {
     docs: {
       description: {
         story: `
+\`pixelationPreset\` chooses \`pixelationPresets.nearest\` or \`pixelationPresets.smooth\`. \`pixelationBlockSize\` replaces that preset's \`blockSize\` and must be \`>= 2\`. It is ignored while the preset is \`off\`. The result is an SVG wrapper around a pixelated PNG. \`emojiToSvg\` has no native source.
+
 \`\`\`ts
-const svg = await emojiToSvg("👾", { size: 96, pixelate: 8 });
-document.querySelector("#target")!.innerHTML = svg;
+import { emojiToSvg, pixelationPresets } from "emoji-renderer";
+
+const blockSize = 12;
+
+const svg = await emojiToSvg("🧟", {
+  size: 96,
+  pixelation: {
+    ...pixelationPresets.nearest,
+    blockSize,
+  },
+});
 \`\`\`
         `,
       },
     },
   },
   render: renderSvgPreview,
+};
+
+export const CustomPixelationStages: Story = {
+  name: "Custom pixelation stages",
+  args: {
+    emoji: "🧟",
+    size: 96,
+    pixelate: 0,
+    pixelationPreset: "off",
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: `
+\`quality\` has no effect while that stage's \`smoothing\` is off. An explicit stage \`background: null\` stays transparent. \`emojiToSvg\` has no top-level canvas background, so an omitted stage background stays transparent too. \`pixelation\` wins when \`pixelate\` is also passed.
+
+\`\`\`ts
+import { emojiToSvg, nearestPixelation } from "emoji-renderer";
+
+await emojiToSvg("🧟", {
+  size: 96,
+  pixelation: {
+    ...nearestPixelation,
+    blockSize: 6,
+    downscale: { ...nearestPixelation.downscale, background: null },
+    upscale: { smoothing: true, quality: "high" },
+  },
+});
+\`\`\`
+        `,
+      },
+    },
+  },
+  render: (args) =>
+    renderSvgPreviewWith(args, {
+      ...nearestPixelation,
+      blockSize: 6,
+      downscale: { ...nearestPixelation.downscale, background: null },
+      upscale: { smoothing: true, quality: "high" },
+    }),
+};
+
+export const AllPixelationOptions: StoryObj<EmojiToSvgStoryArgs & PixelationDemoArgs> = {
+  name: "All pixelation options",
+  args: {
+    emoji: "🧟",
+    size: 96,
+    pixelate: 0,
+    pixelationPreset: "off",
+    responsiveMode: "fixed",
+    ...pixelationDemoArgs,
+    "pixelation.downscale.quality": "high",
+    "pixelation.downscale.rounding": "round",
+    "pixelation.downscale.background": "omit",
+    "pixelation.upscale.quality": "high",
+    "pixelation.upscale.background": "omit",
+  },
+  argTypes: pixelationDemoArgTypes,
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Every `pixelation` field is a control. `omit` drops that stage `background` from the object. Keep responsive on fixed.",
+      },
+    },
+  },
+  render: (args) => renderSvgPreviewWith(args, pixelationFromDemoArgs(args)),
 };
 
 export const NoCache: Story = {

@@ -1,5 +1,6 @@
 export { emojiToSvg } from "./emojiToSvg.ts";
 export { emojiToImage } from "./emojiToImage.ts";
+export { nearestPixelation, pixelationPresets, smoothPixelation } from "./pixelation.ts";
 export {
   buildAssetUrl,
   buildAssetUrlAsync,
@@ -15,6 +16,14 @@ export {
   isFluentSource,
 } from "./fluentMeta.ts";
 export { buildFluentAssetUrl, folderToFileStem, lookupFluentEntry } from "./fluent.ts";
+
+export type {
+  PixelationDownscaleOptions,
+  PixelationOptions,
+  PixelationRounding,
+  PixelationScaleOptions,
+  PixelationSmoothingQuality,
+} from "./pixelation.ts";
 
 export type {
   CodePointFormat,

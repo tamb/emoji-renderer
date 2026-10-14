@@ -126,6 +126,7 @@ export default defineConfig({
         "src/generated/**",
         "src/**/*.test.ts",
         "src/**/*.stories.ts",
+        "src/pixelationDemo.ts",
       ],
       thresholds: {
         lines: 90,
