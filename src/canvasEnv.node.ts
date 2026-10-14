@@ -1,5 +1,5 @@
 import type { Image } from "@napi-rs/canvas";
-import { RasterizeError } from "./errors.ts";
+import { NODE_CANVAS_INSTALL_HINT, RasterizeError } from "./errors.ts";
 import type { NodeCanvasLike, NodeImageLike } from "./canvasEnv.ts";
 
 /**
@@ -10,10 +10,24 @@ import type { NodeCanvasLike, NodeImageLike } from "./canvasEnv.ts";
  * markup to PNG before loadImage when the URL is an inline svg data URL.
  */
 
-const NODE_CANVAS_INSTALL_HINT =
-  'Install optional peers "@napi-rs/canvas" and "@resvg/resvg-js" to rasterize emoji images in Node.js';
-
 type NodeCanvasModule = typeof import("@napi-rs/canvas");
+
+function isMissingOptionalPeer(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "ERR_MODULE_NOT_FOUND"
+  );
+}
+
+function rethrowPeerLoadFailure(error: unknown, cacheMissing: () => void): never {
+  if (isMissingOptionalPeer(error)) {
+    cacheMissing();
+    throw new RasterizeError(NODE_CANVAS_INSTALL_HINT);
+  }
+  throw error;
+}
 
 let nodeCanvasModule: NodeCanvasModule | null | undefined;
 let resvgModule: typeof import("@resvg/resvg-js") | null | undefined;
@@ -44,9 +58,10 @@ async function loadResvg(): Promise<typeof import("@resvg/resvg-js")> {
     // Lazy optional peer — keeps the published bundle free of native .node bindings.
     resvgModule = await import("@resvg/resvg-js");
     return resvgModule;
-  } catch {
-    resvgModule = null;
-    throw new RasterizeError(NODE_CANVAS_INSTALL_HINT);
+  } catch (error) {
+    rethrowPeerLoadFailure(error, () => {
+      resvgModule = null;
+    });
   }
 }
 
@@ -71,9 +86,10 @@ async function loadNodeCanvas(): Promise<NodeCanvasModule> {
     try {
       nodeCanvasModule = await nodeCanvasLoaderOverride();
       return nodeCanvasModule;
-    } catch {
-      nodeCanvasModule = null;
-      throw new RasterizeError(NODE_CANVAS_INSTALL_HINT);
+    } catch (error) {
+      rethrowPeerLoadFailure(error, () => {
+        nodeCanvasModule = null;
+      });
     }
   }
 
@@ -81,9 +97,10 @@ async function loadNodeCanvas(): Promise<NodeCanvasModule> {
     // Lazy optional peer — keeps the published bundle free of native .node bindings.
     nodeCanvasModule = await import("@napi-rs/canvas");
     return nodeCanvasModule;
-  } catch {
-    nodeCanvasModule = null;
-    throw new RasterizeError(NODE_CANVAS_INSTALL_HINT);
+  } catch (error) {
+    rethrowPeerLoadFailure(error, () => {
+      nodeCanvasModule = null;
+    });
   }
 }
 

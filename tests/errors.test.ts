@@ -43,5 +43,10 @@ describe("errors", () => {
 
     const customError = new RasterizeError("canvas missing");
     expect(customError.message).toBe("canvas missing");
+
+    const cause = new Error("Cannot find module './canvasEnv.node.mjs'");
+    const withCause = new RasterizeError(cause.message, { cause });
+    expect(withCause.message).toBe(cause.message);
+    expect(withCause.cause).toBe(cause);
   });
 });

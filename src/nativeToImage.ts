@@ -104,11 +104,15 @@ export async function nativeEmojiToImageBlob(options: NativeToImageOptions): Pro
 
     return canvasToBlob(sourceCanvas, mimeType);
   } catch (error) {
-    throw error instanceof RasterizeError ||
+    if (
+      error instanceof RasterizeError ||
       error instanceof InvalidEmojiError ||
       error instanceof IncompatibleOptionsError
-      ? error
-      : new RasterizeError(String(error));
+    ) {
+      throw error;
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    throw new RasterizeError(message, { cause: error });
   }
 }
 

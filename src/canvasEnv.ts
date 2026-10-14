@@ -1,5 +1,7 @@
 import { RasterizeError } from "./errors.ts";
 
+export { NODE_CANVAS_INSTALL_HINT } from "./errors.ts";
+
 /**
  * Browser-safe canvas adapter. Node rasterization lives in canvasEnv.node.ts and
  * is loaded only at runtime when no DOM canvas is available (see loadNodeEnv).
@@ -7,9 +9,6 @@ import { RasterizeError } from "./errors.ts";
  * Keeping native peer imports out of this file prevents Vite/Vitest browser projects
  * from scanning @napi-rs/canvas / @resvg/resvg-js and choking on their .node binaries.
  */
-
-export const NODE_CANVAS_INSTALL_HINT =
-  'Install optional peers "@napi-rs/canvas" and "@resvg/resvg-js" to rasterize emoji images in Node.js';
 
 // Structural types shared with canvasEnv.node.ts without importing that module
 // (a static import would pull native deps back into the browser bundle graph).
@@ -58,33 +57,27 @@ interface NodeCanvasEnvModule {
   resetNodeCanvasModuleForTests(): void;
 }
 
-let nodeEnv: NodeCanvasEnvModule | null | undefined;
+let nodeEnv: NodeCanvasEnvModule | undefined;
 // Queued before the first loadNodeEnv call so tests can inject a mock loader.
 let pendingNodeCanvasLoader: NodeCanvasLoader | undefined;
 
 async function loadNodeEnv(): Promise<NodeCanvasEnvModule> {
   if (nodeEnv !== undefined) {
-    if (nodeEnv === null) {
-      throw new RasterizeError(NODE_CANVAS_INSTALL_HINT);
-    }
     return nodeEnv;
   }
 
-  try {
-    // Dynamic import + @vite-ignore: only resolved in Node, never pre-bundled for browser tests.
-    const env = (await import(
-      /* @vite-ignore */ "./canvasEnv.node.ts"
-    )) as unknown as NodeCanvasEnvModule;
-    if (pendingNodeCanvasLoader !== undefined) {
-      env.setNodeCanvasLoaderForTests(pendingNodeCanvasLoader);
-      pendingNodeCanvasLoader = undefined;
-    }
-    nodeEnv = env;
-    return env;
-  } catch {
-    nodeEnv = null;
-    throw new RasterizeError(NODE_CANVAS_INSTALL_HINT);
+  // Dynamic import + @vite-ignore: Vite must not follow this into native .node
+  // binaries. vp pack rewrites the specifier to the emitted .mjs chunk.
+  // A failure to load that chunk is surfaced; missing peers throw from the adapter.
+  const env = (await import(
+    /* @vite-ignore */ "./canvasEnv.node.ts"
+  )) as unknown as NodeCanvasEnvModule;
+  if (pendingNodeCanvasLoader !== undefined) {
+    env.setNodeCanvasLoaderForTests(pendingNodeCanvasLoader);
+    pendingNodeCanvasLoader = undefined;
   }
+  nodeEnv = env;
+  return env;
 }
 
 export function resetNodeCanvasModuleForTests(): void {

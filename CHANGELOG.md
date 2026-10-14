@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Node rasterization loads the published canvas adapter chunk, so `emojiToImage` returns a PNG when the optional canvas peers are installed.
 - Text-default emoji with VS16 (coffin, keycaps, etc.) resolve to VS16-stripped CDN filenames instead of 404ing on `-fe0f` paths.
 - Unit coverage excludes Node-only `canvasEnv.node.ts` and generated files so CI thresholds reflect the happy-dom test project.
 

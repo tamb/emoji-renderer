@@ -139,9 +139,11 @@ export async function svgToImageBlob(options: SvgToImageOptions): Promise<Blob> 
     await drawImageToContext(context, image, size, background, pixelation);
     return canvasToBlob(canvas, mimeType);
   } catch (error) {
-    throw error instanceof RasterizeError || error instanceof IncompatibleOptionsError
-      ? error
-      : new RasterizeError(String(error));
+    if (error instanceof RasterizeError || error instanceof IncompatibleOptionsError) {
+      throw error;
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    throw new RasterizeError(message, { cause: error });
   }
 }
 
