@@ -120,7 +120,8 @@ Fluent assets are looked up by Unicode from a generated map of the official [mic
 | `cache`            | both           | `true`             | Cache fetched SVG text in memory                                                                                                       |
 | `signal`           | both           | —                  | `AbortSignal` for fetch                                                                                                                |
 | `xmlDeclaration`   | `emojiToSvg`   | `false`            | Prefix SVG with `<?xml ...?>`                                                                                                          |
-| `pixelate`         | both           | off                | Block size in px; `>= 2` pixelates                                                                                                     |
+| `pixelate`         | both           | off                | **Deprecated, removed in v2.** `number` block size. `>= 2` is coerced to `{ blockSize }` with smooth defaults. Use `pixelation`        |
+| `pixelation`       | both           | off                | `{ blockSize, downscale?, upscale? }`. Finite `blockSize >= 2`. Wins over `pixelate`                                                   |
 | `format`           | `emojiToImage` | `"image"`          | `"image"`, `"blob"`, or `"dataUrl"`                                                                                                    |
 | `mimeType`         | `emojiToImage` | `"image/png"`      | `"image/png"` or `"image/webp"`                                                                                                        |
 | `background`       | `emojiToImage` | `null`             | Canvas fill color before drawing                                                                                                       |
@@ -130,6 +131,45 @@ Fluent assets are looked up by Unicode from a generated map of the official [mic
 | `sizes`            | `emojiToImage` | —                  | Optional `<img sizes>` when `srcSet` is set                                                                                            |
 
 \* `"native"` applies to `emojiToImage` only. It draws the platform emoji font via canvas (no CDN fetch). Appearance varies by OS/browser; some glyphs may be clipped (see below).
+
+### Pixelation
+
+`pixelate` is a `number` and will be removed in v2. `pixelation` is a `PixelationOptions` object. They are different types: v1 coerces `pixelate >= 2` into `{ blockSize: pixelate }` and does not merge that number into a `pixelation` object when both are set. The `>=` check uses JavaScript ToNumber, so a numeric string currently counts as on. Values below 2 are a silent no-op, not a block size. v2 drops the number, that coercion, and that ToNumber check. `pixelation.blockSize` must already be a finite number `>= 2`.
+
+`{ blockSize: 8 }` with neither stage set matches `pixelate: 8` on an even split. Omitted stages use smooth defaults:
+
+- Downscale: `smoothing: true`, `quality: "low"` (bilinear), `rounding: "floor"`. Cell count is `max(1, floor(size / blockSize))`. The low-res canvas is stretched to `size`, so non-divisible sizes keep mixed block widths.
+- Upscale: `smoothing: false`, `quality: "low"` (nearest enlarge).
+- `quality` is set on the canvas context but has no visible effect while that stage's `smoothing` is false. It is still stored so smoothing can be turned on later.
+- Omit a stage `background` to use the top-level `background`. Explicit `null` stays transparent. That omit-versus-null distinction stays in v2.
+- `smoothPixelation` is today's `pixelate` filter. `nearestPixelation` is nearest-neighbor on both draws, with `rounding: "round"`. `pixelationPresets` groups them.
+- When both options are set, `pixelation` wins.
+
+```ts
+import { emojiToImage, emojiToSvg, pixelationPresets } from "emoji-renderer";
+
+const blockSize = 12;
+
+await emojiToImage("🧟", {
+  source: "native",
+  size: 96,
+  background: "#111111",
+  pixelation: {
+    ...pixelationPresets.nearest,
+    blockSize,
+  },
+});
+
+await emojiToSvg("🧟", {
+  size: 96,
+  pixelation: {
+    ...pixelationPresets.nearest,
+    blockSize,
+  },
+});
+```
+
+`emojiToSvg` has no native source, so that call uses the CDN artwork and returns an SVG wrapper around the pixelated PNG. `responsive` together with `pixelate` or `pixelation` throws on `emojiToSvg`. Swap `pixelationPresets.smooth` for the bilinear shrink. `blockSize` must be a finite number `>= 2`.
 
 ### Native source clipping
 
@@ -165,17 +205,17 @@ const srcsetImg = await emojiToImage("😀", {
 });
 ```
 
-`responsive` is incompatible with `pixelate` on `emojiToSvg`. `srcSet` requires `format: "image"`.
+`responsive` is incompatible with `pixelate` and with `pixelation` on `emojiToSvg`. `srcSet` requires `format: "image"`.
 
 ### Errors
 
-| Error                      | When                                                                   |
-| -------------------------- | ---------------------------------------------------------------------- |
-| `InvalidEmojiError`        | Empty or invalid emoji input                                           |
-| `EmojiNotFoundError`       | Asset missing (HTTP 404/410, unmapped Fluent glyph)                    |
-| `EmojiFetchError`          | Transient fetch failure (network, HTTP 429/5xx, timeout after retries) |
-| `IncompatibleOptionsError` | Conflicting options (e.g. `responsive` + `pixelate`)                   |
-| `RasterizeError`           | Canvas/image rasterization failed                                      |
+| Error                      | When                                                                                                    |
+| -------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `InvalidEmojiError`        | Empty or invalid emoji input                                                                            |
+| `EmojiNotFoundError`       | Asset missing (HTTP 404/410, unmapped Fluent glyph)                                                     |
+| `EmojiFetchError`          | Transient fetch failure (network, HTTP 429/5xx, timeout after retries)                                  |
+| `IncompatibleOptionsError` | Conflicting options (e.g. `responsive` + `pixelate` or `pixelation`, or `pixelation.blockSize` below 2) |
+| `RasterizeError`           | Canvas/image rasterization failed                                                                       |
 
 Both `EmojiNotFoundError` and `EmojiFetchError` trigger `fallbacks` when set. User aborts (`AbortSignal`) do not.
 

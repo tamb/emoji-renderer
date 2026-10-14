@@ -139,3 +139,92 @@ export function mockCanvas(): () => void {
     globalThis.OffscreenCanvas = originalOffscreenCanvas;
   };
 }
+
+export interface TrackedDrawContext {
+  fillStyle: string;
+  font: string;
+  textAlign: CanvasTextAlign;
+  textBaseline: CanvasTextBaseline;
+  imageSmoothingEnabled: boolean;
+  imageSmoothingQuality: ImageSmoothingQuality;
+  fillRect: ReturnType<typeof vi.fn>;
+  drawImage: ReturnType<typeof vi.fn>;
+  fillText: ReturnType<typeof vi.fn>;
+  smoothingAtDraw: boolean[];
+  qualityAtDraw: ImageSmoothingQuality[];
+  fills: Array<{ style: string; width: number; height: number }>;
+}
+
+export interface TrackedCanvas {
+  width: number;
+  height: number;
+  context: TrackedDrawContext;
+}
+
+/**
+ * One 2D context per canvas so downscale flags can be told from upscale flags.
+ * Smoothing starts off and quality starts at `"high"` so tests can see the draw path set them.
+ */
+export function installTrackedCanvases(): { canvases: TrackedCanvas[]; restore: () => void } {
+  const originalOffscreenCanvas = globalThis.OffscreenCanvas;
+  // happy-dom exposes OffscreenCanvas without a working 2D context.
+  // @ts-expect-error test override
+  delete globalThis.OffscreenCanvas;
+
+  const canvases: TrackedCanvas[] = [];
+
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(function (
+    this: HTMLCanvasElement,
+  ) {
+    const context: TrackedDrawContext = {
+      fillStyle: "",
+      font: "",
+      textAlign: "start",
+      textBaseline: "alphabetic",
+      imageSmoothingEnabled: false,
+      imageSmoothingQuality: "high",
+      fillRect: vi.fn(),
+      drawImage: vi.fn(),
+      fillText: vi.fn(),
+      smoothingAtDraw: [],
+      qualityAtDraw: [],
+      fills: [],
+    };
+    context.fillRect = vi.fn((...args: unknown[]) => {
+      const width = args[2];
+      const height = args[3];
+      context.fills.push({
+        style: String(context.fillStyle),
+        width: typeof width === "number" ? width : Number.NaN,
+        height: typeof height === "number" ? height : Number.NaN,
+      });
+    });
+    context.drawImage = vi.fn(() => {
+      context.smoothingAtDraw.push(context.imageSmoothingEnabled);
+      context.qualityAtDraw.push(context.imageSmoothingQuality);
+    });
+    canvases.push({ width: this.width, height: this.height, context });
+    return context as unknown as CanvasRenderingContext2D;
+  });
+
+  vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((callback) => {
+    callback(new Blob(["png"], { type: "image/png" }));
+  });
+
+  const ImageMock = function ImageMock(this: unknown) {
+    const image = document.createElement("img");
+    queueMicrotask(() => {
+      image.dispatchEvent(new Event("load"));
+    });
+    return image;
+  } as unknown as typeof Image;
+
+  vi.spyOn(globalThis, "Image").mockImplementation(ImageMock);
+
+  return {
+    canvases,
+    restore: () => {
+      globalThis.OffscreenCanvas = originalOffscreenCanvas;
+    },
+  };
+}

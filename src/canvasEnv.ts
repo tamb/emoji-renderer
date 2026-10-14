@@ -35,6 +35,7 @@ export interface MinimalCanvasContext2D {
   fillText(text: string, x: number, y: number): void;
   drawImage(image: CanvasImageSource, ...args: number[]): void;
   imageSmoothingEnabled: boolean;
+  imageSmoothingQuality: ImageSmoothingQuality;
 }
 
 export type CanvasLike = HTMLCanvasElement | OffscreenCanvas | NodeCanvasLike;

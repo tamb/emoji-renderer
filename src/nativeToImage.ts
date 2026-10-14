@@ -1,4 +1,6 @@
-import { InvalidEmojiError, RasterizeError } from "./errors.ts";
+import { IncompatibleOptionsError, InvalidEmojiError, RasterizeError } from "./errors.ts";
+import { coercePixelation } from "./pixelation.ts";
+import type { PixelationOptions } from "./pixelation.ts";
 import {
   blobToDataUrl,
   canvasToBlob,
@@ -16,7 +18,28 @@ export interface NativeToImageOptions {
   size?: number;
   mimeType?: "image/png" | "image/webp";
   background?: string | null;
+  /**
+   * @deprecated Removed in v2. Use `pixelation`.
+   *
+   * `pixelate` is a `number`. `pixelation` is a `PixelationOptions` object.
+   * Those are different types and are not merged: when both are set, the object
+   * is used as given and this number is not copied into `blockSize` or either stage.
+   *
+   * Until v2, values `>= 2` are coerced to `{ blockSize: pixelate }` with smooth
+   * defaults (bilinear downscale, nearest upscale, `rounding: "floor"`).
+   * Values below 2 mean off, do not warn, and are not coerced. The `>=` check
+   * uses JavaScript ToNumber, so a numeric string counts as on. v2 removes
+   * this option, that coercion, and that ToNumber check. While the coercion
+   * is active, the glyph canvas stays transparent and stage backgrounds are
+   * applied later.
+   */
   pixelate?: number;
+  /**
+   * Downscale and upscale settings. Wins over `pixelate` when both are set.
+   * `blockSize` must be a finite number `>= 2` (not coerced from a string).
+   * An active object also keeps the glyph canvas transparent.
+   */
+  pixelation?: PixelationOptions;
   fontFamily?: string;
 }
 
@@ -48,15 +71,25 @@ async function renderNativeEmojiCanvas(options: NativeToImageOptions) {
 }
 
 export async function nativeEmojiToImageBlob(options: NativeToImageOptions): Promise<Blob> {
-  const { size = 72, mimeType = "image/png", background = null, pixelate } = options;
+  const {
+    size = 72,
+    mimeType = "image/png",
+    background = null,
+    pixelate,
+    pixelation: pixelationOption,
+  } = options;
+  // Coerce once. v2 removes `pixelate: number` and this number-to-object step.
+  // An active result keeps the glyph canvas transparent so stage backgrounds
+  // are the only fills. A null result still paints `background` on the text.
+  const pixelation = coercePixelation({ pixelate, pixelation: pixelationOption });
 
   try {
     const sourceCanvas = await renderNativeEmojiCanvas({
       ...options,
-      background: pixelate !== undefined && pixelate >= 2 ? null : background,
+      background: pixelation !== null ? null : background,
     });
 
-    if (pixelate !== undefined && pixelate >= 2) {
+    if (pixelation !== null) {
       const outputCanvas = await createCanvas(size);
       const outputContext = get2dContext(outputCanvas);
       await drawImageToContext(
@@ -64,14 +97,16 @@ export async function nativeEmojiToImageBlob(options: NativeToImageOptions): Pro
         sourceCanvas as CanvasImageSource,
         size,
         background,
-        pixelate,
+        pixelation,
       );
       return canvasToBlob(outputCanvas, mimeType);
     }
 
     return canvasToBlob(sourceCanvas, mimeType);
   } catch (error) {
-    throw error instanceof RasterizeError || error instanceof InvalidEmojiError
+    throw error instanceof RasterizeError ||
+      error instanceof InvalidEmojiError ||
+      error instanceof IncompatibleOptionsError
       ? error
       : new RasterizeError(String(error));
   }

@@ -35,7 +35,7 @@ export default defineConfig({
   pack: {
     entry: ["src/index.ts", "src/emojiToSvg.ts", "src/emojiToImage.ts"],
     dts: {
-      tsgo: true,
+      generator: "tsgo",
     },
     exports: false,
     deps: {

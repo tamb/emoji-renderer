@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { emojiToSvg } from "../src/emojiToSvg.ts";
 import { EmojiNotFoundError, IncompatibleOptionsError, InvalidEmojiError } from "../src/errors.ts";
+import {
+  PIXELATE_DEPRECATION_WARNING,
+  resetPixelateDeprecationForTests,
+  smoothPixelation,
+} from "../src/pixelation.ts";
 import { sharedSvgCache } from "../src/svgCache.ts";
 import {
   createMockFetch,
@@ -183,7 +188,78 @@ describe("emojiToSvg", () => {
           pixelate: 8,
           responsive: true,
         }),
-      ).rejects.toBeInstanceOf(IncompatibleOptionsError);
+      ).rejects.toThrow(
+        "responsive is incompatible with pixelate on emojiToSvg because pixelated output embeds a raster image",
+      );
+    } finally {
+      restoreOffscreenCanvas();
+    }
+  });
+
+  test("returns a raster-backed SVG for smoothPixelation", async () => {
+    const restoreOffscreenCanvas = mockCanvas();
+
+    try {
+      const svg = await emojiToSvg("😀", {
+        fetch: mockTwemojiFetch(),
+        size: 48,
+        pixelation: smoothPixelation,
+      });
+
+      expect(svg).toContain("<image");
+      expect(svg).toContain('href="data:image/png');
+      expect(svg).not.toContain("<circle");
+    } finally {
+      restoreOffscreenCanvas();
+    }
+  });
+
+  test("throws when responsive is combined with pixelation", async () => {
+    await expect(
+      emojiToSvg("😀", {
+        fetch: mockTwemojiFetch(),
+        pixelation: { blockSize: 8 },
+        responsive: true,
+      }),
+    ).rejects.toThrow(
+      "responsive is incompatible with pixelation on emojiToSvg because pixelated output embeds a raster image",
+    );
+  });
+
+  test("allows responsive when pixelate is below 2", async () => {
+    resetPixelateDeprecationForTests();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const svg = await emojiToSvg("😀", {
+      fetch: mockTwemojiFetch(),
+      pixelate: 1,
+      responsive: true,
+    });
+
+    expect(warn).not.toHaveBeenCalled();
+    expect(svg).toContain('viewBox="0 0 36 36"');
+    expect(svg).not.toMatch(/\swidth="/);
+  });
+
+  test("throws IncompatibleOptionsError for pixelation blockSize below 2", async () => {
+    await expect(emojiToSvg("😀", { pixelation: { blockSize: 1 } })).rejects.toBeInstanceOf(
+      IncompatibleOptionsError,
+    );
+  });
+
+  test("warns once when pixelate is coerced for a raster SVG", async () => {
+    resetPixelateDeprecationForTests();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const restoreOffscreenCanvas = mockCanvas();
+
+    try {
+      await emojiToSvg("😀", {
+        fetch: mockTwemojiFetch(),
+        size: 48,
+        pixelate: 8,
+      });
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(PIXELATE_DEPRECATION_WARNING);
     } finally {
       restoreOffscreenCanvas();
     }
