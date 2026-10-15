@@ -2,6 +2,26 @@
 
 Convert emoji to SVG markup or raster images. Both `emojiToSvg` and `emojiToImage` default to lazy-loaded [Twemoji](https://github.com/jdecked/twemoji) assets. [OpenMoji](https://openmoji.org/), [Noto Emoji](https://github.com/googlefonts/noto-emoji), [Fluent Emoji](https://github.com/microsoft/fluentui-emoji), and native system-font rendering are also available.
 
+Interactive examples are in the [Storybook on GitHub Pages](https://tamb.github.io/emoji-renderer/). Start with the [overview](https://tamb.github.io/emoji-renderer/?path=/docs/introduction--docs). API notes for each function are in the [emojiToSvg docs](https://tamb.github.io/emoji-renderer/?path=/docs/emoji-emojitosvg--docs) and [emojiToImage docs](https://tamb.github.io/emoji-renderer/?path=/docs/emoji-emojitoimage--docs).
+
+## Contents
+
+- [Install](#install)
+- [Usage](#usage)
+  - [Tree-shakable imports](#tree-shakable-imports)
+  - [Image output formats](#image-output-formats)
+  - [Sources](#sources)
+- [Options](#options)
+  - [Pixelation](#pixelation)
+  - [Native source clipping](#native-source-clipping)
+  - [Responsive output](#responsive-output)
+  - [Errors](#errors)
+- [Production deployment](#production-deployment)
+- [Browser vs Node](#browser-vs-node)
+- [Development](#development)
+- [Attribution](#attribution)
+- [License](#license)
+
 ## Install
 
 ```bash
@@ -181,7 +201,13 @@ CDN sources (`"twemoji"`, `"openmoji"`, `"noto"`) draw fitted SVG assets into th
 
 ### Responsive output
 
-**SVG (true vector scaling):**
+`responsive` means a different thing on each function.
+
+**`emojiToSvg` keeps the artwork as vectors.** `responsive: true` is `{ mode: "intrinsic" }`. Pixel `width` and `height` are removed and a `viewBox` is kept, so CSS sets the display size and the paths stay sharp. `size` is not written onto the element. `relative` writes CSS lengths (default `1em` × `1em`) so the glyph follows the surrounding font size. `fill` writes percentages (default `100%` × `100%`) so the SVG fills its container. `viewBox` is used only when the fetched SVG has none; otherwise the asset's `viewBox` is kept.
+
+**`emojiToImage` still returns a raster.** `responsive: true` is `{ dpr: "auto", display: "css" }`. The canvas is drawn at `round(size × devicePixelRatio)` and the `<img>` is displayed at the logical CSS size, so a 48px emoji stays 48px on the page and stays sharp on a retina screen. Off means a 1× bitmap with HTML `width` and `height` attributes. `blob` and `dataUrl` get the higher-resolution bitmap only. Pass `style.width`, `style.height`, and `style.objectFit` to replace the default CSS size.
+
+`srcSet` is separate and requires `format: "image"`. Each logical width is drawn at that width times the same device pixel ratio, and those physical widths become the `srcset` descriptors.
 
 ```ts
 const svg = await emojiToSvg("😀", { responsive: true });
@@ -190,11 +216,7 @@ const svg = await emojiToSvg("😀", { responsive: true });
 const emSized = await emojiToSvg("😀", {
   responsive: { mode: "relative", width: "1.2em", height: "1.2em" },
 });
-```
 
-**Raster (retina + CSS display, or srcset):**
-
-```ts
 const img = await emojiToImage("😀", { size: 48, responsive: true });
 
 const srcsetImg = await emojiToImage("😀", {
@@ -205,7 +227,7 @@ const srcsetImg = await emojiToImage("😀", {
 });
 ```
 
-`responsive` is incompatible with `pixelate` and with `pixelation` on `emojiToSvg`. `srcSet` requires `format: "image"`.
+`responsive` is incompatible with `pixelate` and with `pixelation` on `emojiToSvg`, because pixelation embeds a PNG. `srcSet` requires `format: "image"`.
 
 ### Errors
 

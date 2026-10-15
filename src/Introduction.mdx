@@ -1,0 +1,91 @@
+import { Meta } from "@storybook/addon-docs/blocks";
+
+<Meta title="Introduction" />
+
+# emoji-renderer
+
+Convert an emoji into SVG markup or a raster image. `emojiToSvg` and `emojiToImage` both default to lazy-loaded Twemoji artwork. OpenMoji, Noto Emoji, Fluent Emoji, and the platform emoji font are available too.
+
+## Contents
+
+### This page
+
+- [What it does](#what-it-does)
+- [Methods](#methods)
+- [Sources](#sources)
+- [Responsive](#responsive)
+- [Install and runtime](#install-and-runtime)
+
+### emojiToSvg
+
+Vector markup. Full page: [emojiToSvg](?path=/docs/emoji-emojitosvg--docs).
+
+- [Usage](?path=/docs/emoji-emojitosvg--docs#usage)
+- [Examples](?path=/docs/emoji-emojitosvg--docs#examples)
+- [Options](?path=/docs/emoji-emojitosvg--docs#options)
+- [source](?path=/docs/emoji-emojitosvg--docs#source)
+- [responsive](?path=/docs/emoji-emojitosvg--docs#responsive)
+- [PixelationOptions](?path=/docs/emoji-emojitosvg--docs#pixelationoptions)
+- [Errors](?path=/docs/emoji-emojitosvg--docs#errors)
+
+### emojiToImage
+
+Raster output. Full page: [emojiToImage](?path=/docs/emoji-emojitoimage--docs).
+
+- [Usage](?path=/docs/emoji-emojitoimage--docs#usage)
+- [Examples](?path=/docs/emoji-emojitoimage--docs#examples)
+- [Options](?path=/docs/emoji-emojitoimage--docs#options)
+- [source](?path=/docs/emoji-emojitoimage--docs#source)
+- [responsive](?path=/docs/emoji-emojitoimage--docs#responsive)
+- [Native clipping](?path=/docs/emoji-emojitoimage--docs#native-clipping)
+- [PixelationOptions](?path=/docs/emoji-emojitoimage--docs#pixelationoptions)
+- [Errors](?path=/docs/emoji-emojitoimage--docs#errors)
+
+## What it does
+
+Pass an emoji string, including ZWJ sequences such as 👨‍👩‍👧. The library fetches SVG from a CDN preset, or draws the system emoji font when you ask for a native image. `emojiToSvg` returns that markup. `emojiToImage` draws it to a canvas and returns an `HTMLImageElement`, a `Blob`, or a data URL.
+
+Preset CDN sources serve known artwork. A custom `baseUrl` can return untrusted SVG. Do not assign fetched SVG to `innerHTML` unless you trust the source or sanitize it.
+
+## Methods
+
+```ts
+import { emojiToSvg, emojiToImage } from "emoji-renderer";
+
+const svg = await emojiToSvg("😀", { size: 48 });
+const image = await emojiToImage("🎉", { size: 48 });
+document.body.append(image);
+```
+
+Tree-shakable entry points are `emoji-renderer/emojiToSvg` and `emoji-renderer/emojiToImage`.
+
+`emojiToSvg` has no native source. Pixelation on that call embeds a PNG inside an SVG wrapper. `emojiToImage` can use `source: "native"` and can fall back to the system font after CDN sources fail.
+
+## Sources
+
+- `"twemoji"` — both. Default. CC BY 4.0.
+- `"openmoji"` — both. CC BY-SA 4.0.
+- `"noto"` — both. Apache 2.0 / OFL.
+- `"fluent"` — both. MIT. `style` is `color`, `flat`, `high-contrast`, or `3d`.
+- `{ baseUrl, ext?, codePointFormat? }` — both. Your own asset host.
+- `"native"` — `emojiToImage` only. System emoji font, with no CDN fetch.
+
+`fallbacks` tries more CDN presets after `source` fails. `fallbackToNative` on `emojiToImage` draws the system font if those presets fail too.
+
+## Responsive
+
+`responsive` means a different thing on each method.
+
+On `emojiToSvg` it keeps the artwork as vectors. `responsive: true` drops the pixel `width` and `height` and leaves a `viewBox`, so CSS sets the size and the paths stay sharp. `relative` sizes the SVG in `em`. `fill` sizes it as a percentage of its container. It cannot be combined with pixelation, because pixelation embeds a bitmap. Details: [responsive on emojiToSvg](?path=/docs/emoji-emojitosvg--docs#responsive).
+
+On `emojiToImage` the result is still a bitmap. `responsive: true` draws extra pixels for the screen's device pixel ratio, then displays the image at the logical CSS size so it stays sharp on retina screens. `srcSet` renders several widths for layout-responsive images. Details: [responsive on emojiToImage](?path=/docs/emoji-emojitoimage--docs#responsive).
+
+## Install and runtime
+
+```bash
+npm install emoji-renderer
+```
+
+The package is ESM-only and needs Node.js 22 or newer. Raster output in Node also needs the optional `@napi-rs/canvas` and `@resvg/resvg-js` packages. `emojiToImage` with `format: "image"` needs a browser DOM.
+
+Install steps, the full options table, production hosting, and the development scripts are in the [README](https://github.com/tamb/emoji-renderer#readme).

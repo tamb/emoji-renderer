@@ -129,6 +129,16 @@ const meta = {
         component: `
 Fetches CDN SVG artwork for an emoji and returns inline SVG markup. Defaults to Twemoji; OpenMoji, Noto, and Fluent presets are also available.
 
+## Contents
+
+- [Usage](#usage)
+- [Examples](#examples)
+- [Options](#options)
+  - [source](#source)
+  - [responsive](#responsive)
+- [PixelationOptions](#pixelationoptions)
+- [Errors](#errors)
+
 ## Usage
 
 \`\`\`ts
@@ -226,7 +236,7 @@ const svg = await emojiToSvg("😀", {
 });
 \`\`\`
 
-**Options**
+## Options
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -255,14 +265,26 @@ const svg = await emojiToSvg("😀", {
 
 ### \`responsive\`
 
-\`ResponsiveSvgOptions\`. \`responsive: true\` is \`{ mode: "intrinsic" }\`.
+Keeps the artwork as vectors and changes the \`<svg>\` opening tag so CSS can scale it. \`responsive: true\` is \`{ mode: "intrinsic" }\`.
+
+Off, the default, writes pixel \`width\` and \`height\` from \`size\` (default \`72\`).
+
+\`mode: "intrinsic"\` removes those pixel attributes and keeps a \`viewBox\`, so the graphic has no fixed pixel size. Size it with CSS (\`width: 2rem; height: auto\`). The paths stay sharp at any size. \`size\` is not written onto the element.
+
+\`mode: "relative"\` writes CSS lengths on the element. Both default to \`1em\`, so the glyph follows the surrounding font size. Pass \`width\` and \`height\` for another length, such as \`1.2em\`.
+
+\`mode: "fill"\` writes percentage sizes. Both default to \`100%\`, so the SVG fills its container. Pass \`width\` and \`height\` to override those percentages.
+
+\`viewBox\` is used only when the fetched SVG has no \`viewBox\` of its own. An existing \`viewBox\` is kept. When both are missing, the fallback is \`0 0 36 36\`.
+
+\`responsive\` with \`pixelate\` or \`pixelation\` throws \`IncompatibleOptionsError\`. Pixelation embeds a PNG, and that image does not scale as a vector.
 
 | Field | Type | Default |
 | --- | --- | --- |
 | \`mode\` | \`"intrinsic" \\| "relative" \\| "fill"\` | \`"intrinsic"\` |
-| \`width\` | \`string\` | omitted |
-| \`height\` | \`string\` | omitted |
-| \`viewBox\` | \`string\` | omitted |
+| \`width\` | \`string\` | \`1em\` for \`relative\`, \`100%\` for \`fill\`, omitted for \`intrinsic\` |
+| \`height\` | \`string\` | \`1em\` for \`relative\`, \`100%\` for \`fill\`, omitted for \`intrinsic\` |
+| \`viewBox\` | \`string\` | the asset's \`viewBox\`, or \`0 0 36 36\` when it has none |
 
 ## PixelationOptions
 

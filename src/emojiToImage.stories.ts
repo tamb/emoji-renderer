@@ -169,7 +169,16 @@ const meta = {
         component: `
 Fetches CDN SVG artwork (or draws native system emoji), rasterizes via canvas, and returns an image. The function defaults to Twemoji. These stories use \`source: "native"\` unless the story is demonstrating a CDN or Fluent source.
 
-**Native clipping:** \`"native"\` draws the system emoji font onto a square canvas. Some glyphs can look cropped or cut in half — especially on mobile, where Apple Color Emoji and other platform fonts sit outside the typographic box. CDN presets draw fitted, uncropped artwork.
+## Contents
+
+- [Usage](#usage)
+- [Examples](#examples)
+- [Options](#options)
+  - [source](#source)
+  - [responsive](#responsive)
+- [Native clipping](#native-clipping)
+- [PixelationOptions](#pixelationoptions)
+- [Errors](#errors)
 
 ## Usage
 
@@ -282,7 +291,7 @@ const image = await emojiToImage("🧟", {
 document.body.append(image);
 \`\`\`
 
-**Options**
+## Options
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -318,7 +327,21 @@ document.body.append(image);
 
 ### \`responsive\`
 
-\`ResponsiveImageOptions\`:
+Still returns a raster. It chooses how many pixels are drawn and how an \`HTMLImageElement\` is displayed. \`responsive: true\` is \`{ dpr: "auto", display: "css" }\`.
+
+Off means \`dpr: 1\` and \`display: "fixed"\`: the canvas is \`size\` pixels on each side, and the image's HTML \`width\` and \`height\` attributes are that same size.
+
+\`dpr: "auto"\` reads \`devicePixelRatio\`, or \`1\` when that value is missing or not a positive number. The canvas is drawn at \`round(size × dpr)\`. A \`size: 48\` emoji on a 2× screen is a 96×96 bitmap shown at 48 CSS pixels, so it stays sharp. Pass a number to force a scale, such as \`dpr: 2\`.
+
+\`display: "css"\` sets CSS \`width\` and \`height\` to the logical size (\`48px\` when \`size\` is \`48\`) instead of the HTML attributes. \`display: "fixed"\` sets the HTML \`width\` and \`height\` attributes to \`size\` and does not add that CSS.
+
+\`style.width\`, \`style.height\`, and \`style.objectFit\` (\`contain\`, \`cover\`, or \`fill\`) replace the default CSS size. They apply when \`display\` is \`"css"\`.
+
+\`format: "blob"\` and \`format: "dataUrl"\` still use the higher-resolution bitmap. There is no element, so display CSS is not applied.
+
+An options object defaults \`dpr\` to \`"auto"\` and \`display\` to \`"css"\`.
+
+\`srcSet\` is separate. It requires \`format: "image"\`. Each logical width is drawn at \`round(width × dpr)\`, and those physical widths become the \`srcset\` descriptors (\`48w\`, \`96w\`, …). \`sizes\` is copied to the \`<img>\` when set. Pass \`responsive\` with \`srcSet\` when the element should also use CSS display sizing. Pixelation stays available: \`blockSize\` is constant, and the cell count follows each render size.
 
 | Field | Type | \`responsive: true\` |
 | --- | --- | --- |
@@ -328,7 +351,9 @@ document.body.append(image);
 | \`style.height\` | \`string\` | logical size in px |
 | \`style.objectFit\` | \`"contain" \\| "cover" \\| "fill"\` | omitted |
 
-Off means \`dpr: 1\` and \`display: "fixed"\`. An object defaults \`dpr\` to \`"auto"\` and \`display\` to \`"css"\`.
+## Native clipping
+
+\`"native"\` draws the system emoji font onto a square canvas. Some glyphs can look cropped or cut in half — especially on mobile, where Apple Color Emoji and other platform fonts sit outside the typographic box. CDN presets draw fitted, uncropped artwork.
 
 ## PixelationOptions
 
