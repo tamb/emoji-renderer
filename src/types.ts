@@ -51,9 +51,19 @@ export interface EmojiBaseOptions {
    *
    * Raster output applies this after drawing and pixelation, including a
    * canvas `background`. Vector `emojiToSvg` keeps the paths and adds an
-   * `feColorMatrix` saturate filter.
+   * `feColorMatrix` saturate filter. Cannot be combined with `saturation`.
    */
   desaturate?: Desaturate;
+  /**
+   * Multiply the original saturation. `0` is grayscale, `1` leaves color
+   * unchanged, and values above `1` make the emoji more vivid. `0.2` keeps
+   * 20% of the original saturation. Omit to leave color unchanged.
+   *
+   * This is the same mix as `desaturate`, with the scale pointed the other
+   * way and room to boost color. Cannot be combined with `desaturate`.
+   * Numeric strings are not coerced.
+   */
+  saturation?: number;
 }
 
 export type ResponsiveSvgMode = "intrinsic" | "relative" | "fill";

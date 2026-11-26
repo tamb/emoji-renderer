@@ -4,7 +4,11 @@ import {
   resetNodeCanvasModuleForTests,
   setNodeCanvasLoaderForTests,
 } from "../src/canvasEnv.ts";
-import { DESATURATE_RANGE_MESSAGE } from "../src/desaturate.ts";
+import {
+  COLOR_SCALE_CONFLICT_MESSAGE,
+  DESATURATE_RANGE_MESSAGE,
+  SATURATION_RANGE_MESSAGE,
+} from "../src/desaturate.ts";
 import { IncompatibleOptionsError, RasterizeError } from "../src/errors.ts";
 import {
   PIXELATE_DEPRECATION_WARNING,
@@ -490,6 +494,52 @@ describe("svgToImage", () => {
     await svgToImageBlob({ svg: SAMPLE_SVG, size: 16, desaturate: false });
 
     expect(getImageData).not.toHaveBeenCalled();
+  });
+
+  test("saturation multiplies the finished bitmap and can boost it", async () => {
+    restoreOffscreenCanvas = mockCanvas();
+    const kept = new Uint8ClampedArray([255, 0, 0, 255]);
+    const getImageData = vi.fn(() => ({ data: kept, width: 1, height: 1 }));
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      fillStyle: "",
+      fillRect: vi.fn(),
+      drawImage: vi.fn(),
+      imageSmoothingEnabled: true,
+      imageSmoothingQuality: "low",
+      getImageData,
+      putImageData: vi.fn(),
+    } as unknown as CanvasRenderingContext2D);
+
+    await svgToImageBlob({ svg: SAMPLE_SVG, size: 16, saturation: 0.2 });
+    expect(Array.from(kept)).toEqual([94, 43, 43, 255]);
+
+    const boosted = new Uint8ClampedArray([255, 204, 77, 255]);
+    getImageData.mockReturnValue({ data: boosted, width: 1, height: 1 });
+    await svgToImageBlob({ svg: SAMPLE_SVG, size: 16, saturation: 1.5 });
+    expect(Array.from(boosted)).toEqual([255, 203, 13, 255]);
+  });
+
+  test("does not read pixels when saturation is 1", async () => {
+    restoreOffscreenCanvas = mockCanvas();
+    const getImageData = vi.fn();
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      fillStyle: "",
+      fillRect: vi.fn(),
+      drawImage: vi.fn(),
+      getImageData,
+    } as unknown as CanvasRenderingContext2D);
+
+    await svgToImageBlob({ svg: SAMPLE_SVG, size: 16, saturation: 1 });
+    expect(getImageData).not.toHaveBeenCalled();
+  });
+
+  test("throws when saturation is invalid or combined with desaturate", async () => {
+    await expect(svgToImageBlob({ svg: SAMPLE_SVG, saturation: -0.5 })).rejects.toThrow(
+      SATURATION_RANGE_MESSAGE,
+    );
+    await expect(
+      svgToImageBlob({ svg: SAMPLE_SVG, desaturate: 0.2, saturation: 1.5 }),
+    ).rejects.toThrow(COLOR_SCALE_CONFLICT_MESSAGE);
   });
 
   test("throws when desaturate is outside 0 to 1", async () => {

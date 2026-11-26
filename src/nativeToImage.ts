@@ -1,4 +1,4 @@
-import { desaturateCanvas, resolveDesaturate } from "./desaturate.ts";
+import { resolveColorScale, saturateCanvas } from "./desaturate.ts";
 import type { Desaturate } from "./desaturate.ts";
 import { IncompatibleOptionsError, InvalidEmojiError, RasterizeError } from "./errors.ts";
 import { coercePixelation } from "./pixelation.ts";
@@ -45,9 +45,15 @@ export interface NativeToImageOptions {
   /**
    * Applied to the finished bitmap, after pixelation. `true` removes all
    * color. A number from 0 to 1 removes that fraction of the original saturation.
-   * A background fill is included.
+   * A background fill is included. Cannot be combined with `saturation`.
    */
   desaturate?: Desaturate;
+  /**
+   * Saturation multiplier applied to the finished bitmap, including a
+   * background fill. `0` is grayscale, `1` is unchanged, and values above `1`
+   * boost color.
+   */
+  saturation?: number;
   fontFamily?: string;
 }
 
@@ -86,12 +92,13 @@ export async function nativeEmojiToImageBlob(options: NativeToImageOptions): Pro
     pixelate,
     pixelation: pixelationOption,
     desaturate,
+    saturation,
   } = options;
   // Coerce once. v2 removes `pixelate: number` and this number-to-object step.
   // An active result keeps the glyph canvas transparent so stage backgrounds
   // are the only fills. A null result still paints `background` on the text.
   const pixelation = coercePixelation({ pixelate, pixelation: pixelationOption });
-  const desaturation = resolveDesaturate(desaturate);
+  const colorScale = resolveColorScale({ desaturate, saturation });
 
   try {
     const sourceCanvas = await renderNativeEmojiCanvas({
@@ -112,8 +119,8 @@ export async function nativeEmojiToImageBlob(options: NativeToImageOptions): Pro
       );
     }
 
-    if (desaturation !== null) {
-      desaturateCanvas(get2dContext(outputCanvas), size, desaturation);
+    if (colorScale !== null) {
+      saturateCanvas(get2dContext(outputCanvas), size, colorScale);
     }
 
     return canvasToBlob(outputCanvas, mimeType);

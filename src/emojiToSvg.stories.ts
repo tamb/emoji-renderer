@@ -17,6 +17,7 @@ interface EmojiToSvgStoryArgs {
   size: number;
   xmlDeclaration: boolean;
   desaturate: number;
+  saturation: number;
   pixelate: number;
   pixelationPreset: "off" | "smooth" | "nearest";
   pixelationBlockSize: number;
@@ -38,6 +39,7 @@ const meta = {
     size: 72,
     xmlDeclaration: false,
     desaturate: 0,
+    saturation: 1,
     pixelate: 0,
     pixelationPreset: "off",
     pixelationBlockSize: 8,
@@ -66,7 +68,12 @@ const meta = {
     desaturate: {
       control: { type: "number", min: 0, max: 1, step: 0.1 },
       description:
-        "Fraction of the original saturation to remove. `0` is unchanged, `0.2` removes 20% (80% remains), and `1` is grayscale. `true` matches `1`. Vector output keeps the paths and adds a saturate filter. Pixelated output desaturates the embedded PNG instead.",
+        "Fraction of the original saturation to remove. `0` is unchanged, `0.2` removes 20% (80% remains), and `1` is grayscale. `true` matches `1`. Vector output keeps the paths and adds a saturate filter. Pixelated output desaturates the embedded PNG instead. Leave this at 0 when using saturation.",
+    },
+    saturation: {
+      control: { type: "number", min: 0, max: 2, step: 0.1 },
+      description:
+        "Multiplier of the original saturation. `1` is unchanged, `0.2` keeps 20%, `0` is grayscale, and values above `1` boost color with a color matrix. Leave this at 1 when using desaturate.",
     },
     pixelate: {
       control: { type: "number", min: 0, max: 32, step: 1 },
@@ -258,7 +265,8 @@ const svg = await emojiToSvg("😀", {
 | \`xmlDeclaration\` | \`boolean\` | \`false\` | Include \`<?xml ...?>\` on the returned markup. Active pixelation still honors this on the wrapper; the inner SVG is written without it |
 | \`pixelate\` | \`number\` | off | Deprecated, removed in v2. A \`number\`, not a \`PixelationOptions\` object. See **PixelationOptions** |
 | \`pixelation\` | \`PixelationOptions\` | off | See **PixelationOptions** below. Used as given when \`pixelate\` is also set. Incompatible with \`responsive\` |
-| \`desaturate\` | \`true \\| number\` | off | \`true\` or \`1\` removes all color. \`0.2\` removes 20% of the original saturation (80% remains). Vector output adds a saturate filter. Pixelated output desaturates the embedded PNG |
+| \`desaturate\` | \`true \\| number\` | off | \`true\` or \`1\` removes all color. \`0.2\` removes 20% of the original saturation (80% remains). Vector output adds a saturate filter. Pixelated output desaturates the embedded PNG. Cannot be combined with \`saturation\` |
+| \`saturation\` | \`number\` | off | Multiplier of the original saturation. \`0\` is grayscale, \`1\` is unchanged, \`0.2\` keeps 20%, and values above \`1\` boost color. Cannot be combined with \`desaturate\` |
 | \`responsive\` | \`boolean \\| ResponsiveSvgOptions\` | off | CSS-scalable SVG. See **responsive** below. Incompatible with active pixelation |
 
 ### \`source\`
@@ -359,7 +367,7 @@ const pixelationPresets = {
 | \`InvalidEmojiError\` | Empty or invalid emoji input |
 | \`EmojiNotFoundError\` | Asset missing (HTTP 404/410, unmapped Fluent glyph) |
 | \`EmojiFetchError\` | Transient fetch failure after \`retries\` (network, HTTP 429/5xx, timeout) |
-| \`IncompatibleOptionsError\` | \`responsive\` with \`pixelate >= 2\` or with \`pixelation\`, \`pixelation.blockSize\` is not a finite number \`>= 2\`, or \`desaturate\` is not \`true\` or a finite number from 0 to 1 |
+| \`IncompatibleOptionsError\` | \`responsive\` with \`pixelate >= 2\` or with \`pixelation\`, \`pixelation.blockSize\` is not a finite number \`>= 2\`, an invalid \`desaturate\` or \`saturation\`, or both color options together |
 | \`RasterizeError\` | Canvas or image rasterization failed while embedding a pixelated PNG |
 
 \`EmojiNotFoundError\` and \`EmojiFetchError\` try \`fallbacks\` when those are set. An aborted \`signal\` does not.
@@ -480,6 +488,7 @@ function renderSvgPreviewWith(
     size: args.size,
     xmlDeclaration: args.xmlDeclaration,
     desaturate: args.desaturate > 0 ? args.desaturate : undefined,
+    saturation: args.saturation === 1 ? undefined : args.saturation,
     pixelate: pixelationOverride === undefined && args.pixelate >= 2 ? args.pixelate : undefined,
     pixelation,
     cache: args.cache,
@@ -774,6 +783,50 @@ export const PartiallyDesaturated: Story = {
 
 \`\`\`ts
 const svg = await emojiToSvg("🌈", { desaturate: 0.2 });
+\`\`\`
+        `,
+      },
+    },
+  },
+  render: renderSvgPreview,
+};
+
+export const Saturated: Story = {
+  name: "20% saturation",
+  args: {
+    emoji: "🌈",
+    saturation: 0.2,
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: `
+\`0.2\` keeps 20% of the original saturation. The paths stay vectors.
+
+\`\`\`ts
+const svg = await emojiToSvg("🌈", { saturation: 0.2 });
+\`\`\`
+        `,
+      },
+    },
+  },
+  render: renderSvgPreview,
+};
+
+export const BoostedSaturation: Story = {
+  name: "Boosted saturation",
+  args: {
+    emoji: "😀",
+    saturation: 1.5,
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: `
+Values above \`1\` use an \`feColorMatrix\` so the emoji can be more vivid than the source.
+
+\`\`\`ts
+const svg = await emojiToSvg("😀", { saturation: 1.5 });
 \`\`\`
         `,
       },

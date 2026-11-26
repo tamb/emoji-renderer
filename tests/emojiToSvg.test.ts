@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, test, vi } from "vite-plus/test";
-import { DESATURATE_RANGE_MESSAGE } from "../src/desaturate.ts";
+import {
+  COLOR_SCALE_CONFLICT_MESSAGE,
+  DESATURATE_RANGE_MESSAGE,
+  SATURATION_RANGE_MESSAGE,
+} from "../src/desaturate.ts";
 import { emojiToSvg } from "../src/emojiToSvg.ts";
 import { EmojiNotFoundError, IncompatibleOptionsError, InvalidEmojiError } from "../src/errors.ts";
 import {
@@ -307,6 +311,41 @@ describe("emojiToSvg", () => {
     } finally {
       restoreOffscreenCanvas();
     }
+  });
+
+  test("saturation 0.2 keeps that fraction and values above 1 use a matrix", async () => {
+    const partial = await emojiToSvg("😀", {
+      fetch: mockTwemojiFetch(),
+      saturation: 0.2,
+    });
+    expect(partial).toContain('feColorMatrix type="saturate" values="0.2"');
+    expect(partial).toContain("<circle");
+
+    const boosted = await emojiToSvg("😀", {
+      fetch: mockTwemojiFetch(),
+      saturation: 1.5,
+    });
+    expect(boosted).toContain('feColorMatrix type="matrix" values="1.3935 -0.3575 -0.036 0 0');
+    expect(boosted).not.toContain('type="saturate"');
+  });
+
+  test("leaves markup unchanged when saturation is 1", async () => {
+    const svg = await emojiToSvg("😀", {
+      fetch: mockTwemojiFetch(),
+      saturation: 1,
+    });
+    expect(svg).not.toContain("feColorMatrix");
+  });
+
+  test("throws when saturation is invalid or combined with desaturate", async () => {
+    const fetchImpl = vi.fn(mockTwemojiFetch());
+    await expect(emojiToSvg("😀", { fetch: fetchImpl, saturation: -1 })).rejects.toThrow(
+      SATURATION_RANGE_MESSAGE,
+    );
+    await expect(
+      emojiToSvg("😀", { fetch: fetchImpl, desaturate: true, saturation: 0.2 }),
+    ).rejects.toThrow(COLOR_SCALE_CONFLICT_MESSAGE);
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   test("throws when desaturate is not a 0 to 1 number", async () => {

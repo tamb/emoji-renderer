@@ -1,4 +1,4 @@
-import { resolveDesaturate } from "./desaturate.ts";
+import { resolveColorScale } from "./desaturate.ts";
 import type { Desaturate } from "./desaturate.ts";
 import { IncompatibleOptionsError, RasterizeError } from "./errors.ts";
 import { shouldTryNextSource } from "./fallback.ts";
@@ -30,6 +30,7 @@ interface RenderEmojiBlobOptions {
   background: string | null;
   pixelation?: PixelationOptions;
   desaturate?: Desaturate;
+  saturation?: number;
   source: EmojiImageSource;
   fallbacks?: EmojiToImageOptions["fallbacks"];
   fallbackToNative?: boolean;
@@ -55,6 +56,7 @@ async function renderEmojiBlob(options: RenderEmojiBlobOptions): Promise<Blob> {
     background,
     pixelation,
     desaturate,
+    saturation,
     source,
     fallbacks,
     fallbackToNative = false,
@@ -72,13 +74,14 @@ async function renderEmojiBlob(options: RenderEmojiBlobOptions): Promise<Blob> {
       background,
       pixelation,
       desaturate,
+      saturation,
       fontFamily,
     });
   }
 
   try {
-    // Desaturate the bitmap below. Leaving it off this SVG call avoids
-    // applying a vector filter and the canvas pass to the same pixels.
+    // Adjust color on the bitmap below. Leaving both options off this SVG
+    // call avoids applying a vector filter and the canvas pass to the same pixels.
     const svg = await emojiToSvg(emoji, {
       size: renderSize,
       source: asCdnSource(source),
@@ -95,6 +98,7 @@ async function renderEmojiBlob(options: RenderEmojiBlobOptions): Promise<Blob> {
       background,
       pixelation,
       desaturate,
+      saturation,
     });
   } catch (error) {
     if (fallbackToNative && shouldTryNextSource(error)) {
@@ -105,6 +109,7 @@ async function renderEmojiBlob(options: RenderEmojiBlobOptions): Promise<Blob> {
         background,
         pixelation,
         desaturate,
+        saturation,
         fontFamily,
       });
     }
@@ -149,6 +154,7 @@ async function renderEmojiImageElement(
     srcSet,
     sizes,
     desaturate,
+    saturation,
     fetch,
     cache,
     signal,
@@ -171,6 +177,7 @@ async function renderEmojiImageElement(
         background,
         pixelation,
         desaturate,
+        saturation,
         source,
         fallbacks,
         fallbackToNative,
@@ -209,6 +216,7 @@ async function renderEmojiImageElement(
     background,
     pixelation,
     desaturate,
+    saturation,
     source,
     fallbacks,
     fallbackToNative,
@@ -242,12 +250,13 @@ export async function emojiToImage<TFormat extends EmojiImageFormat = "image">(
     srcSet,
     sizes,
     desaturate,
+    saturation,
     fetch,
     cache,
     signal,
   } = options;
 
-  resolveDesaturate(desaturate);
+  resolveColorScale({ desaturate, saturation });
 
   if (srcSet && srcSet.length > 0 && format !== "image") {
     throw new IncompatibleOptionsError('srcSet requires format: "image"');
@@ -270,6 +279,7 @@ export async function emojiToImage<TFormat extends EmojiImageFormat = "image">(
       srcSet,
       sizes,
       desaturate,
+      saturation,
       fetch,
       cache,
       signal,
@@ -285,6 +295,7 @@ export async function emojiToImage<TFormat extends EmojiImageFormat = "image">(
     background,
     pixelation,
     desaturate,
+    saturation,
     source,
     fallbacks,
     fallbackToNative,

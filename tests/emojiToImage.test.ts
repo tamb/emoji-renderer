@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
-import { DESATURATE_RANGE_MESSAGE } from "../src/desaturate.ts";
+import { COLOR_SCALE_CONFLICT_MESSAGE, DESATURATE_RANGE_MESSAGE } from "../src/desaturate.ts";
 import { emojiToImage } from "../src/emojiToImage.ts";
 import { IncompatibleOptionsError } from "../src/errors.ts";
 import {
@@ -279,6 +279,14 @@ describe("emojiToImage", () => {
     expect(getImageData).toHaveBeenCalledWith(0, 0, 24, 24);
     expect(getImageData).toHaveBeenCalledWith(0, 0, 48, 48);
     vi.unstubAllGlobals();
+  });
+
+  test("throws before fetching when desaturate and saturation are combined", async () => {
+    const fetchImpl = vi.fn(mockTwemojiFetch());
+    await expect(
+      emojiToImage("😀", { fetch: fetchImpl, desaturate: true, saturation: 1.2 }),
+    ).rejects.toThrow(COLOR_SCALE_CONFLICT_MESSAGE);
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   test("throws before fetching when desaturate is invalid", async () => {

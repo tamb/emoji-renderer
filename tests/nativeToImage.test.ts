@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from "vite-plus/test";
-import { DESATURATE_RANGE_MESSAGE } from "../src/desaturate.ts";
+import { DESATURATE_RANGE_MESSAGE, SATURATION_RANGE_MESSAGE } from "../src/desaturate.ts";
 import { IncompatibleOptionsError, InvalidEmojiError, RasterizeError } from "../src/errors.ts";
 import { resetPixelateDeprecationForTests } from "../src/pixelation.ts";
 import {
@@ -152,6 +152,29 @@ describe("nativeToImage", () => {
 
     expect(getImageData).toHaveBeenCalledWith(0, 0, 24, 24);
     expect(Array.from(data)).toEqual([54, 54, 54, 255]);
+  });
+
+  test("saturation 0 grays the text canvas", async () => {
+    restoreOffscreenCanvas = mockCanvas();
+    const data = new Uint8ClampedArray([255, 0, 0, 255]);
+    const getImageData = vi.fn(() => ({ data, width: 1, height: 1 }));
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
+      mock2dContext({
+        getImageData,
+        putImageData: vi.fn(),
+      } as unknown as Partial<CanvasRenderingContext2D>),
+    );
+
+    await nativeEmojiToImageBlob({ emoji: "🎉", size: 24, saturation: 0 });
+
+    expect(getImageData).toHaveBeenCalledWith(0, 0, 24, 24);
+    expect(Array.from(data)).toEqual([54, 54, 54, 255]);
+  });
+
+  test("throws when saturation is negative", async () => {
+    await expect(nativeEmojiToImageBlob({ emoji: "🎉", saturation: -1 })).rejects.toThrow(
+      SATURATION_RANGE_MESSAGE,
+    );
   });
 
   test("throws when desaturate is outside 0 to 1", async () => {

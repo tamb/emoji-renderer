@@ -5,7 +5,7 @@ import {
   get2dContext,
   loadImageFromUrl,
 } from "./canvasEnv.ts";
-import { desaturateCanvas, resolveDesaturate } from "./desaturate.ts";
+import { resolveColorScale, saturateCanvas } from "./desaturate.ts";
 import type { Desaturate } from "./desaturate.ts";
 import { IncompatibleOptionsError, RasterizeError } from "./errors.ts";
 import { coercePixelation, resolvePixelation } from "./pixelation.ts";
@@ -46,8 +46,14 @@ export interface SvgToImageOptions {
   /**
    * Applied to the finished bitmap, after pixelation. `true` removes all
    * color. A number from 0 to 1 removes that fraction of the original saturation.
+   * Cannot be combined with `saturation`.
    */
   desaturate?: Desaturate;
+  /**
+   * Saturation multiplier applied to the finished bitmap. `0` is grayscale,
+   * `1` is unchanged, and values above `1` boost color. `0.2` keeps 20%.
+   */
+  saturation?: number;
 }
 
 interface DrawableContext {
@@ -134,11 +140,12 @@ export async function svgToImageBlob(options: SvgToImageOptions): Promise<Blob> 
     pixelate,
     pixelation: pixelationOption,
     desaturate,
+    saturation,
   } = options;
   // Coerce here so direct callers warn once. `emojiToImage` coerces first and
   // forwards only `pixelation`, so a legacy number is not coerced a second time.
   const pixelation = coercePixelation({ pixelate, pixelation: pixelationOption }) ?? undefined;
-  const desaturation = resolveDesaturate(desaturate);
+  const colorScale = resolveColorScale({ desaturate, saturation });
 
   try {
     const image = (await loadImageFromUrl(svgMarkupToDataUrl(svg))) as CanvasImageSource;
@@ -146,8 +153,8 @@ export async function svgToImageBlob(options: SvgToImageOptions): Promise<Blob> 
     const context = get2dContext(canvas);
 
     await drawImageToContext(context, image, size, background, pixelation);
-    if (desaturation !== null) {
-      desaturateCanvas(context, size, desaturation);
+    if (colorScale !== null) {
+      saturateCanvas(context, size, colorScale);
     }
     return canvasToBlob(canvas, mimeType);
   } catch (error) {
