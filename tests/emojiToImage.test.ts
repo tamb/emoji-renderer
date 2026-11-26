@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
+import { DESATURATE_RANGE_MESSAGE } from "../src/desaturate.ts";
 import { emojiToImage } from "../src/emojiToImage.ts";
 import { IncompatibleOptionsError } from "../src/errors.ts";
 import {
@@ -251,6 +252,41 @@ describe("emojiToImage", () => {
     expect(blob).toBeInstanceOf(Blob);
     expect(fillText).toHaveBeenCalledWith("😀", 36, 36);
     expect(fetchImpl).toHaveBeenCalled();
+  });
+
+  test("desaturates each srcset bitmap without filtering the source SVG", async () => {
+    restoreOffscreenCanvas = mockCanvas();
+    const data = new Uint8ClampedArray([255, 0, 0, 255]);
+    const getImageData = vi.fn(() => ({ data, width: 1, height: 1 }));
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      fillStyle: "",
+      fillRect: vi.fn(),
+      drawImage: vi.fn(),
+      imageSmoothingEnabled: true,
+      imageSmoothingQuality: "low",
+      getImageData,
+      putImageData: vi.fn(),
+    } as unknown as CanvasRenderingContext2D);
+    vi.stubGlobal("devicePixelRatio", 1);
+
+    await emojiToImage("😀", {
+      desaturate: 0.2,
+      srcSet: [24, 48],
+      fetch: mockTwemojiFetch(),
+    });
+
+    expect(getImageData).toHaveBeenCalledTimes(2);
+    expect(getImageData).toHaveBeenCalledWith(0, 0, 24, 24);
+    expect(getImageData).toHaveBeenCalledWith(0, 0, 48, 48);
+    vi.unstubAllGlobals();
+  });
+
+  test("throws before fetching when desaturate is invalid", async () => {
+    const fetchImpl = vi.fn(mockTwemojiFetch());
+    await expect(
+      emojiToImage("😀", { fetch: fetchImpl, desaturate: "full" as never }),
+    ).rejects.toThrow(DESATURATE_RANGE_MESSAGE);
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   test("throws IncompatibleOptionsError for pixelation blockSize below 2", async () => {

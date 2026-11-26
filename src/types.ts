@@ -1,4 +1,7 @@
+import type { Desaturate } from "./desaturate.ts";
 import type { PixelationOptions } from "./pixelation.ts";
+
+export type { Desaturate };
 
 export type CodePointFormat = "twemoji" | "openmoji" | "noto";
 
@@ -38,6 +41,19 @@ export interface EmojiBaseOptions {
   timeout?: number;
   /** Same-source retry count for transient fetch failures (network, 429, 5xx). Default: 2. */
   retries?: number;
+  /**
+   * Pull the rendered emoji toward grayscale.
+   *
+   * `true` removes all color. A finite number from 0 to 1 is the fraction of
+   * the original saturation to remove: `0.2` removes 20% (80% remains), `1`
+   * matches `true`, and `0` leaves color unchanged. `false` and omitting the
+   * option also leave color unchanged. Numeric strings are not coerced.
+   *
+   * Raster output applies this after drawing and pixelation, including a
+   * canvas `background`. Vector `emojiToSvg` keeps the paths and adds an
+   * `feColorMatrix` saturate filter.
+   */
+  desaturate?: Desaturate;
 }
 
 export type ResponsiveSvgMode = "intrinsic" | "relative" | "fill";

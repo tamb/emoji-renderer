@@ -13,6 +13,7 @@ Interactive examples are in the [Storybook on GitHub Pages](https://tamb.github.
   - [Sources](#sources)
 - [Options](#options)
   - [Pixelation](#pixelation)
+  - [Desaturation](#desaturation)
   - [Native source clipping](#native-source-clipping)
   - [Responsive output](#responsive-output)
   - [Errors](#errors)
@@ -142,6 +143,7 @@ Fluent assets are looked up by Unicode from a generated map of the official [mic
 | `xmlDeclaration`   | `emojiToSvg`   | `false`            | Prefix SVG with `<?xml ...?>`                                                                                                          |
 | `pixelate`         | both           | off                | **Deprecated, removed in v2.** `number` block size. `>= 2` is coerced to `{ blockSize }` with smooth defaults. Use `pixelation`        |
 | `pixelation`       | both           | off                | `{ blockSize, downscale?, upscale? }`. Finite `blockSize >= 2`. Wins over `pixelate`                                                   |
+| `desaturate`       | both           | off                | `true` removes all color. `0`–`1` removes that fraction of saturation (`0.2` removes 20%, so 80% remains)                              |
 | `format`           | `emojiToImage` | `"image"`          | `"image"`, `"blob"`, or `"dataUrl"`                                                                                                    |
 | `mimeType`         | `emojiToImage` | `"image/png"`      | `"image/png"` or `"image/webp"`                                                                                                        |
 | `background`       | `emojiToImage` | `null`             | Canvas fill color before drawing                                                                                                       |
@@ -191,6 +193,22 @@ await emojiToSvg("🧟", {
 
 `emojiToSvg` has no native source, so that call uses the CDN artwork and returns an SVG wrapper around the pixelated PNG. `responsive` together with `pixelate` or `pixelation` throws on `emojiToSvg`. Swap `pixelationPresets.smooth` for the bilinear shrink. `blockSize` must be a finite number `>= 2`.
 
+### Desaturation
+
+`desaturate` pulls the emoji toward grayscale.
+
+- `true` or `1` removes all color.
+- A number from 0 to 1 is the fraction of the original saturation to remove. `0.2` removes 20% of that saturation, so 80% remains.
+- `0`, `false`, and omitting the option leave the colors unchanged.
+- The number must already be a finite number from 0 to 1. A numeric string is not coerced and throws `IncompatibleOptionsError`.
+
+`emojiToImage` desaturates the finished bitmap after pixelation, so a `background` fill is included. Vector `emojiToSvg` keeps the paths and adds an `feColorMatrix` saturate filter. Pixelated `emojiToSvg` desaturates the embedded PNG instead, and the wrapper does not add a second filter. `responsive` still works with `desaturate` on vector output.
+
+```ts
+await emojiToImage("😀", { desaturate: true });
+await emojiToSvg("😀", { desaturate: 0.2 });
+```
+
 ### Native source clipping
 
 When `source` is `"native"`, the emoji is drawn as text onto a square canvas at about 85% of `size` and centered with `textBaseline: "middle"`. That centers the typographic em-box, not the visible glyph.
@@ -231,13 +249,13 @@ const srcsetImg = await emojiToImage("😀", {
 
 ### Errors
 
-| Error                      | When                                                                                                    |
-| -------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `InvalidEmojiError`        | Empty or invalid emoji input                                                                            |
-| `EmojiNotFoundError`       | Asset missing (HTTP 404/410, unmapped Fluent glyph)                                                     |
-| `EmojiFetchError`          | Transient fetch failure (network, HTTP 429/5xx, timeout after retries)                                  |
-| `IncompatibleOptionsError` | Conflicting options (e.g. `responsive` + `pixelate` or `pixelation`, or `pixelation.blockSize` below 2) |
-| `RasterizeError`           | Canvas/image rasterization failed                                                                       |
+| Error                      | When                                                                                                                                        |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `InvalidEmojiError`        | Empty or invalid emoji input                                                                                                                |
+| `EmojiNotFoundError`       | Asset missing (HTTP 404/410, unmapped Fluent glyph)                                                                                         |
+| `EmojiFetchError`          | Transient fetch failure (network, HTTP 429/5xx, timeout after retries)                                                                      |
+| `IncompatibleOptionsError` | Conflicting options (e.g. `responsive` + `pixelate` or `pixelation`, `pixelation.blockSize` below 2, or `desaturate` outside `true` or 0–1) |
+| `RasterizeError`           | Canvas/image rasterization failed                                                                                                           |
 
 Both `EmojiNotFoundError` and `EmojiFetchError` trigger `fallbacks` when set. User aborts (`AbortSignal`) do not.
 

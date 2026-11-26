@@ -28,6 +28,7 @@ export type {
 export type {
   CodePointFormat,
   CustomEmojiSource,
+  Desaturate,
   EmojiBaseOptions,
   EmojiCdnPreset,
   EmojiImageFormat,

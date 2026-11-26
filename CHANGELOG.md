@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `desaturate` option. `true` removes all color. A number from 0 to 1 removes that fraction of the original saturation (`0.2` removes 20%, so 80% remains).
 - `pixelation` option with per-stage smoothing, quality, rounding, and background, plus `smoothPixelation`, `nearestPixelation`, and `pixelationPresets`.
 - `pixelate` remains, warns once, and is coerced to `{ blockSize }` until v2. The number and that coercion (including the `>=` ToNumber check) will be removed in v2. `pixelation` wins when both are set.
 

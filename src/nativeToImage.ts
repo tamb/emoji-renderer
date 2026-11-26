@@ -1,3 +1,5 @@
+import { desaturateCanvas, resolveDesaturate } from "./desaturate.ts";
+import type { Desaturate } from "./desaturate.ts";
 import { IncompatibleOptionsError, InvalidEmojiError, RasterizeError } from "./errors.ts";
 import { coercePixelation } from "./pixelation.ts";
 import type { PixelationOptions } from "./pixelation.ts";
@@ -40,6 +42,12 @@ export interface NativeToImageOptions {
    * An active object also keeps the glyph canvas transparent.
    */
   pixelation?: PixelationOptions;
+  /**
+   * Applied to the finished bitmap, after pixelation. `true` removes all
+   * color. A number from 0 to 1 removes that fraction of the original saturation.
+   * A background fill is included.
+   */
+  desaturate?: Desaturate;
   fontFamily?: string;
 }
 
@@ -77,11 +85,13 @@ export async function nativeEmojiToImageBlob(options: NativeToImageOptions): Pro
     background = null,
     pixelate,
     pixelation: pixelationOption,
+    desaturate,
   } = options;
   // Coerce once. v2 removes `pixelate: number` and this number-to-object step.
   // An active result keeps the glyph canvas transparent so stage backgrounds
   // are the only fills. A null result still paints `background` on the text.
   const pixelation = coercePixelation({ pixelate, pixelation: pixelationOption });
+  const desaturation = resolveDesaturate(desaturate);
 
   try {
     const sourceCanvas = await renderNativeEmojiCanvas({
@@ -89,8 +99,9 @@ export async function nativeEmojiToImageBlob(options: NativeToImageOptions): Pro
       background: pixelation !== null ? null : background,
     });
 
+    const outputCanvas = pixelation === null ? sourceCanvas : await createCanvas(size);
+
     if (pixelation !== null) {
-      const outputCanvas = await createCanvas(size);
       const outputContext = get2dContext(outputCanvas);
       await drawImageToContext(
         outputContext,
@@ -99,10 +110,13 @@ export async function nativeEmojiToImageBlob(options: NativeToImageOptions): Pro
         background,
         pixelation,
       );
-      return canvasToBlob(outputCanvas, mimeType);
     }
 
-    return canvasToBlob(sourceCanvas, mimeType);
+    if (desaturation !== null) {
+      desaturateCanvas(get2dContext(outputCanvas), size, desaturation);
+    }
+
+    return canvasToBlob(outputCanvas, mimeType);
   } catch (error) {
     if (
       error instanceof RasterizeError ||

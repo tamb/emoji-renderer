@@ -4,6 +4,7 @@ import {
   resetNodeCanvasModuleForTests,
   setNodeCanvasLoaderForTests,
 } from "../src/canvasEnv.ts";
+import { DESATURATE_RANGE_MESSAGE } from "../src/desaturate.ts";
 import { IncompatibleOptionsError, RasterizeError } from "../src/errors.ts";
 import {
   PIXELATE_DEPRECATION_WARNING,
@@ -453,6 +454,48 @@ describe("svgToImage", () => {
 
     expect(tracked.canvases[1]?.context.fills).toEqual([]);
     expect(tracked.canvases[0]?.context.fills).toEqual([{ style: "#fff", width: 32, height: 32 }]);
+  });
+
+  test("desaturates the finished bitmap, including a partial amount", async () => {
+    restoreOffscreenCanvas = mockCanvas();
+    const data = new Uint8ClampedArray([255, 0, 0, 255]);
+    const getImageData = vi.fn(() => ({ data, width: 1, height: 1 }));
+    const putImageData = vi.fn();
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      fillStyle: "",
+      fillRect: vi.fn(),
+      drawImage: vi.fn(),
+      imageSmoothingEnabled: true,
+      imageSmoothingQuality: "low",
+      getImageData,
+      putImageData,
+    } as unknown as CanvasRenderingContext2D);
+
+    await svgToImageBlob({ svg: SAMPLE_SVG, size: 16, desaturate: 0.2 });
+
+    expect(getImageData).toHaveBeenCalledWith(0, 0, 16, 16);
+    expect(Array.from(data)).toEqual([215, 11, 11, 255]);
+  });
+
+  test("does not read pixels when desaturate is off", async () => {
+    restoreOffscreenCanvas = mockCanvas();
+    const getImageData = vi.fn();
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      fillStyle: "",
+      fillRect: vi.fn(),
+      drawImage: vi.fn(),
+      getImageData,
+    } as unknown as CanvasRenderingContext2D);
+
+    await svgToImageBlob({ svg: SAMPLE_SVG, size: 16, desaturate: false });
+
+    expect(getImageData).not.toHaveBeenCalled();
+  });
+
+  test("throws when desaturate is outside 0 to 1", async () => {
+    await expect(svgToImageBlob({ svg: SAMPLE_SVG, desaturate: 1.5 })).rejects.toThrow(
+      DESATURATE_RANGE_MESSAGE,
+    );
   });
 
   test("throws IncompatibleOptionsError for blockSize below 2", async () => {
