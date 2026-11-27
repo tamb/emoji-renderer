@@ -76,7 +76,7 @@
     "@vitest/browser-playwright": "5.0.5",
     "@vitest/coverage-v8": "5.0.5",
     "bumpp": "^11.1.0",
-    "happy-dom": "^20.14.6",
+    "happy-dom": "^21.0.4",
     "playwright": "^1.65.1",
     "storybook": "^10.6.9",
     "typescript": "^7.0.2",
