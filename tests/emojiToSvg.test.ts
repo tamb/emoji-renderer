@@ -1,4 +1,9 @@
 import { beforeEach, describe, expect, test, vi } from "vite-plus/test";
+import {
+  COLOR_SCALE_CONFLICT_MESSAGE,
+  DESATURATE_RANGE_MESSAGE,
+  SATURATION_RANGE_MESSAGE,
+} from "../src/desaturate.ts";
 import { emojiToSvg } from "../src/emojiToSvg.ts";
 import { EmojiNotFoundError, IncompatibleOptionsError, InvalidEmojiError } from "../src/errors.ts";
 import {
@@ -245,6 +250,110 @@ describe("emojiToSvg", () => {
     await expect(emojiToSvg("😀", { pixelation: { blockSize: 1 } })).rejects.toBeInstanceOf(
       IncompatibleOptionsError,
     );
+  });
+
+  test("adds a saturate filter for partial and full desaturation", async () => {
+    const partial = await emojiToSvg("😀", {
+      fetch: mockTwemojiFetch(),
+      desaturate: 0.2,
+      xmlDeclaration: true,
+    });
+    expect(partial.startsWith("<?xml")).toBe(true);
+    expect(partial).toContain('feColorMatrix type="saturate" values="0.8"');
+    expect(partial).toContain("<circle");
+
+    const full = await emojiToSvg("😀", {
+      fetch: mockTwemojiFetch(),
+      desaturate: true,
+      responsive: true,
+    });
+    expect(full).toContain('feColorMatrix type="saturate" values="0"');
+    expect(full).not.toMatch(/\swidth="/);
+  });
+
+  test("leaves markup unchanged when desaturate is off", async () => {
+    const svg = await emojiToSvg("😀", {
+      fetch: mockTwemojiFetch(),
+      desaturate: 0,
+    });
+    expect(svg).not.toContain("feColorMatrix");
+    expect(svg).toContain("<circle");
+  });
+
+  test("desaturates the embedded PNG when pixelation is also set", async () => {
+    const restoreOffscreenCanvas = mockCanvas();
+    const data = new Uint8ClampedArray([255, 0, 0, 255]);
+    const getImageData = vi.fn(() => ({ data, width: 1, height: 1 }));
+    const putImageData = vi.fn();
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      fillStyle: "",
+      fillRect: vi.fn(),
+      drawImage: vi.fn(),
+      imageSmoothingEnabled: true,
+      imageSmoothingQuality: "low",
+      getImageData,
+      putImageData,
+    } as unknown as CanvasRenderingContext2D);
+
+    try {
+      const svg = await emojiToSvg("😀", {
+        fetch: mockTwemojiFetch(),
+        size: 32,
+        pixelation: { blockSize: 8 },
+        desaturate: true,
+      });
+
+      expect(getImageData).toHaveBeenCalledWith(0, 0, 32, 32);
+      expect(putImageData).toHaveBeenCalled();
+      expect(Array.from(data)).toEqual([54, 54, 54, 255]);
+      expect(svg).toContain("<image");
+      expect(svg).not.toContain("feColorMatrix");
+    } finally {
+      restoreOffscreenCanvas();
+    }
+  });
+
+  test("saturation 0.2 keeps that fraction and values above 1 use a matrix", async () => {
+    const partial = await emojiToSvg("😀", {
+      fetch: mockTwemojiFetch(),
+      saturation: 0.2,
+    });
+    expect(partial).toContain('feColorMatrix type="saturate" values="0.2"');
+    expect(partial).toContain("<circle");
+
+    const boosted = await emojiToSvg("😀", {
+      fetch: mockTwemojiFetch(),
+      saturation: 1.5,
+    });
+    expect(boosted).toContain('feColorMatrix type="matrix" values="1.3935 -0.3575 -0.036 0 0');
+    expect(boosted).not.toContain('type="saturate"');
+  });
+
+  test("leaves markup unchanged when saturation is 1", async () => {
+    const svg = await emojiToSvg("😀", {
+      fetch: mockTwemojiFetch(),
+      saturation: 1,
+    });
+    expect(svg).not.toContain("feColorMatrix");
+  });
+
+  test("throws when saturation is invalid or combined with desaturate", async () => {
+    const fetchImpl = vi.fn(mockTwemojiFetch());
+    await expect(emojiToSvg("😀", { fetch: fetchImpl, saturation: -1 })).rejects.toThrow(
+      SATURATION_RANGE_MESSAGE,
+    );
+    await expect(
+      emojiToSvg("😀", { fetch: fetchImpl, desaturate: true, saturation: 0.2 }),
+    ).rejects.toThrow(COLOR_SCALE_CONFLICT_MESSAGE);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  test("throws when desaturate is not a 0 to 1 number", async () => {
+    const fetchImpl = vi.fn(mockTwemojiFetch());
+    await expect(emojiToSvg("😀", { fetch: fetchImpl, desaturate: 2 })).rejects.toThrow(
+      DESATURATE_RANGE_MESSAGE,
+    );
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   test("warns once when pixelate is coerced for a raster SVG", async () => {

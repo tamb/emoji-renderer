@@ -1,3 +1,4 @@
+import { resolveColorScale, saturateSvg } from "./desaturate.ts";
 import { IncompatibleOptionsError } from "./errors.ts";
 import { fetchSvgText } from "./fetchSvg.ts";
 import { normalizeSvg } from "./normalizeSvg.ts";
@@ -19,8 +20,11 @@ export async function emojiToSvg(emoji: string, options: EmojiToSvgOptions = {})
     pixelate,
     pixelation: pixelationOption,
     responsive,
+    desaturate,
+    saturation,
     ...fetchOptions
   } = options;
+  const colorScale = resolveColorScale({ desaturate, saturation });
   // Coerce before the responsive check. v2 removes `pixelate: number`; pass
   // only the object downstream so svg rasterization does not coerce again.
   const pixelation = coercePixelation({ pixelate, pixelation: pixelationOption });
@@ -41,10 +45,14 @@ export async function emojiToSvg(emoji: string, options: EmojiToSvgOptions = {})
   });
 
   if (pixelation !== null) {
+    // Adjust the embedded bitmap after pixelation. The wrapper stays a plain
+    // image so the filter is not applied a second time.
     const dataUrl = await svgToDataUrl({
       svg: normalized,
       size,
       pixelation,
+      desaturate,
+      saturation,
     });
 
     return wrapRasterSvg({
@@ -54,10 +62,15 @@ export async function emojiToSvg(emoji: string, options: EmojiToSvgOptions = {})
     });
   }
 
+  if (colorScale !== null) {
+    return saturateSvg(normalized, colorScale);
+  }
+
   return normalized;
 }
 
 export type {
+  Desaturate,
   EmojiToSvgOptions,
   EmojiSource,
   EmojiBaseOptions,

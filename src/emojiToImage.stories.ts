@@ -18,6 +18,8 @@ interface EmojiToImageStoryArgs {
   format: EmojiImageFormat;
   mimeType: "image/png" | "image/webp";
   background: string;
+  desaturate: number;
+  saturation: number;
   pixelate: number;
   pixelationPreset: "off" | "smooth" | "nearest";
   pixelationBlockSize: number;
@@ -44,6 +46,8 @@ const meta = {
     format: "image",
     mimeType: "image/png",
     background: "",
+    desaturate: 0,
+    saturation: 1,
     pixelate: 0,
     pixelationPreset: "off",
     pixelationBlockSize: 8,
@@ -84,6 +88,16 @@ const meta = {
       control: "color",
       description:
         "Canvas fill color before drawing. Leave empty for transparent. Default: `null`.",
+    },
+    desaturate: {
+      control: { type: "number", min: 0, max: 1, step: 0.1 },
+      description:
+        "Fraction of the original saturation to remove. `0` is unchanged, `0.2` removes 20% (80% remains), and `1` is grayscale. `true` matches `1`. Leave this at 0 when using saturation.",
+    },
+    saturation: {
+      control: { type: "number", min: 0, max: 2, step: 0.1 },
+      description:
+        "Multiplier of the original saturation. `1` is unchanged, `0.2` keeps 20%, `0` is grayscale, and values above `1` boost color. Leave this at 1 when using desaturate.",
     },
     pixelate: {
       control: { type: "number", min: 0, max: 32, step: 1 },
@@ -309,6 +323,8 @@ document.body.append(image);
 | \`background\` | \`string \\| null\` | \`null\` | Canvas fill before drawing. Also the fallback for an omitted stage \`background\` |
 | \`pixelate\` | \`number\` | off | Deprecated, removed in v2. A \`number\`, not a \`PixelationOptions\` object. See **PixelationOptions** |
 | \`pixelation\` | \`PixelationOptions\` | off | See **PixelationOptions** below. Used as given when \`pixelate\` is also set |
+| \`desaturate\` | \`true \\| number\` | off | \`true\` or \`1\` removes all color. \`0.2\` removes 20% of the original saturation (80% remains). Applied after drawing and pixelation, including \`background\`. Cannot be combined with \`saturation\` |
+| \`saturation\` | \`number\` | off | Multiplier of the original saturation. \`0\` is grayscale, \`1\` is unchanged, \`0.2\` keeps 20%, and values above \`1\` boost color. Cannot be combined with \`desaturate\` |
 | \`fontFamily\` | \`string\` | emoji stack | Font stack when \`source\` is \`"native"\` |
 | \`responsive\` | \`boolean \\| ResponsiveImageOptions\` | off | Retina rendering and CSS display sizing. See **responsive** below |
 | \`srcSet\` | \`number[]\` | off | Logical widths for \`<img srcset>\`. Requires \`format: "image"\` |
@@ -420,7 +436,7 @@ const pixelationPresets = {
 | \`InvalidEmojiError\` | Empty or invalid emoji input |
 | \`EmojiNotFoundError\` | Asset missing (HTTP 404/410, unmapped Fluent glyph) |
 | \`EmojiFetchError\` | Transient fetch failure after \`retries\` (network, HTTP 429/5xx, timeout) |
-| \`IncompatibleOptionsError\` | \`pixelation.blockSize must be a finite number >= 2\`, or \`srcSet requires format: "image"\` |
+| \`IncompatibleOptionsError\` | \`pixelation.blockSize must be a finite number >= 2\`, an invalid \`desaturate\` or \`saturation\`, both color options together, or \`srcSet requires format: "image"\` |
 | \`RasterizeError\` | Canvas or image rasterization failed |
 
 \`EmojiNotFoundError\` and \`EmojiFetchError\` try \`fallbacks\` when those are set. An aborted \`signal\` does not.
@@ -526,6 +542,8 @@ function renderImagePreviewWith(
     format: args.format,
     mimeType: args.mimeType,
     background: args.background || null,
+    desaturate: args.desaturate > 0 ? args.desaturate : undefined,
+    saturation: args.saturation === 1 ? undefined : args.saturation,
     pixelate: pixelationOverride === undefined && args.pixelate >= 2 ? args.pixelate : undefined,
     pixelation,
     cache: args.cache,
@@ -872,6 +890,102 @@ document.body.append(image);
   render: renderImagePreview,
 };
 
+export const Desaturated: Story = {
+  name: "Desaturated",
+  args: {
+    emoji: "😀",
+    desaturate: 1,
+    sourceMode: "twemoji",
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: `
+\`true\` removes every bit of saturation. \`1\` is the same call.
+
+\`\`\`ts
+const image = await emojiToImage("😀", { desaturate: true });
+document.body.append(image);
+\`\`\`
+        `,
+      },
+    },
+  },
+  render: renderImagePreview,
+};
+
+export const PartiallyDesaturated: Story = {
+  name: "20% desaturated",
+  args: {
+    emoji: "🌈",
+    desaturate: 0.2,
+    sourceMode: "twemoji",
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: `
+\`0.2\` removes 20% of the original saturation, so 80% remains.
+
+\`\`\`ts
+const image = await emojiToImage("🌈", { desaturate: 0.2 });
+document.body.append(image);
+\`\`\`
+        `,
+      },
+    },
+  },
+  render: renderImagePreview,
+};
+
+export const Saturated: Story = {
+  name: "20% saturation",
+  args: {
+    emoji: "🌈",
+    saturation: 0.2,
+    sourceMode: "twemoji",
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: `
+\`0.2\` keeps 20% of the original saturation. \`0\` is grayscale. \`1\` leaves the emoji unchanged.
+
+\`\`\`ts
+const image = await emojiToImage("🌈", { saturation: 0.2 });
+document.body.append(image);
+\`\`\`
+        `,
+      },
+    },
+  },
+  render: renderImagePreview,
+};
+
+export const BoostedSaturation: Story = {
+  name: "Boosted saturation",
+  args: {
+    emoji: "😀",
+    saturation: 1.5,
+    sourceMode: "twemoji",
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: `
+Values above \`1\` make the emoji more vivid than the source artwork.
+
+\`\`\`ts
+const image = await emojiToImage("😀", { saturation: 1.5 });
+document.body.append(image);
+\`\`\`
+        `,
+      },
+    },
+  },
+  render: renderImagePreview,
+};
+
 export const SideBySideComparison: Story = {
   name: "SVG vs image",
   render: (args) => {
@@ -896,11 +1010,15 @@ export const SideBySideComparison: Story = {
         emojiToSvg(args.emoji, {
           size: args.size,
           cache: args.cache,
+          desaturate: args.desaturate > 0 ? args.desaturate : undefined,
+          saturation: args.saturation === 1 ? undefined : args.saturation,
         }),
       ),
       emojiToImage(args.emoji, {
         size: args.size,
         background: args.background || null,
+        desaturate: args.desaturate > 0 ? args.desaturate : undefined,
+        saturation: args.saturation === 1 ? undefined : args.saturation,
         cache: args.cache,
         source: resolveSource(args),
         fontFamily: args.fontFamily || undefined,

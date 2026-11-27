@@ -44,6 +44,136 @@ describe("node integration", () => {
     expect(blob.size).toBeGreaterThan(0);
   });
 
+  test("vector desaturate filter reduces chroma when rasterized", async () => {
+    if (!hasNodeCanvas) {
+      return;
+    }
+
+    const { Resvg } = await import(/* @vite-ignore */ "@resvg/resvg-js");
+    const { createCanvas, loadImage } = await import(/* @vite-ignore */ "@napi-rs/canvas");
+
+    async function centerChroma(desaturate?: boolean | number): Promise<number> {
+      const svg = await emojiToSvg("😀", {
+        fetch: mockTwemojiFetch(SAMPLE_SVG),
+        cache: false,
+        size: 48,
+        desaturate,
+      });
+      const png = new Resvg(svg, { fitTo: { mode: "width", value: 48 } }).render().asPng();
+      const image = await loadImage(png);
+      const canvas = createCanvas(image.width, image.height);
+      const context = canvas.getContext("2d");
+      context.drawImage(image, 0, 0);
+      const pixel = context.getImageData(
+        Math.floor(image.width / 2),
+        Math.floor(image.height / 2),
+        1,
+        1,
+      ).data;
+      expect(pixel[3]).toBe(255);
+      return Math.max(pixel[0]!, pixel[1]!, pixel[2]!) - Math.min(pixel[0]!, pixel[1]!, pixel[2]!);
+    }
+
+    const full = await centerChroma();
+    const partial = await centerChroma(0.2);
+    const gray = await centerChroma(true);
+
+    expect(full).toBeGreaterThan(100);
+    expect(gray).toBeLessThan(3);
+    expect(partial).toBeGreaterThan(full * 0.7);
+    expect(partial).toBeLessThan(full * 0.9);
+  });
+
+  test("desaturate true is grayscale and 0.2 keeps most of the chroma", async () => {
+    if (!hasNodeCanvas) {
+      return;
+    }
+
+    const { createCanvas, loadImage } = await import(/* @vite-ignore */ "@napi-rs/canvas");
+
+    async function centerChroma(desaturate?: boolean | number): Promise<number> {
+      const blob = await emojiToImage("😀", {
+        fetch: mockTwemojiFetch(SAMPLE_SVG),
+        format: "blob",
+        cache: false,
+        size: 48,
+        desaturate,
+      });
+      const image = await loadImage(Buffer.from(await blob.arrayBuffer()));
+      const canvas = createCanvas(image.width, image.height);
+      const context = canvas.getContext("2d");
+      context.drawImage(image, 0, 0);
+      const pixel = context.getImageData(24, 24, 1, 1).data;
+      expect(pixel[3]).toBe(255);
+      return Math.max(pixel[0]!, pixel[1]!, pixel[2]!) - Math.min(pixel[0]!, pixel[1]!, pixel[2]!);
+    }
+
+    const full = await centerChroma();
+    const partial = await centerChroma(0.2);
+    const gray = await centerChroma(true);
+
+    expect(full).toBeGreaterThan(100);
+    expect(gray).toBeLessThan(3);
+    expect(partial).toBeGreaterThan(full * 0.7);
+    expect(partial).toBeLessThan(full * 0.9);
+  });
+
+  test("saturation 0.2 keeps about a fifth of the chroma and 1.5 increases it", async () => {
+    if (!hasNodeCanvas) {
+      return;
+    }
+
+    const { Resvg } = await import(/* @vite-ignore */ "@resvg/resvg-js");
+    const { createCanvas, loadImage } = await import(/* @vite-ignore */ "@napi-rs/canvas");
+
+    async function chromaFromPng(png: Uint8Array): Promise<number> {
+      const image = await loadImage(png);
+      const canvas = createCanvas(image.width, image.height);
+      const context = canvas.getContext("2d");
+      context.drawImage(image, 0, 0);
+      const pixel = context.getImageData(
+        Math.floor(image.width / 2),
+        Math.floor(image.height / 2),
+        1,
+        1,
+      ).data;
+      expect(pixel[3]).toBe(255);
+      return Math.max(pixel[0]!, pixel[1]!, pixel[2]!) - Math.min(pixel[0]!, pixel[1]!, pixel[2]!);
+    }
+
+    async function imageChroma(saturation?: number): Promise<number> {
+      const blob = await emojiToImage("😀", {
+        fetch: mockTwemojiFetch(SAMPLE_SVG),
+        format: "blob",
+        cache: false,
+        size: 48,
+        saturation,
+      });
+      return chromaFromPng(new Uint8Array(await blob.arrayBuffer()));
+    }
+
+    async function svgChroma(saturation?: number): Promise<number> {
+      const svg = await emojiToSvg("😀", {
+        fetch: mockTwemojiFetch(SAMPLE_SVG),
+        cache: false,
+        size: 48,
+        saturation,
+      });
+      const png = new Resvg(svg, { fitTo: { mode: "width", value: 48 } }).render().asPng();
+      return chromaFromPng(png);
+    }
+
+    for (const chroma of [imageChroma, svgChroma]) {
+      const full = await chroma();
+      const partial = await chroma(0.2);
+      const boosted = await chroma(1.5);
+      expect(full).toBeGreaterThan(100);
+      expect(partial).toBeGreaterThan(full * 0.1);
+      expect(partial).toBeLessThan(full * 0.35);
+      expect(boosted).toBeGreaterThan(full);
+    }
+  });
+
   test("returns a data URL in Node", async () => {
     if (!hasNodeCanvas) {
       return;
